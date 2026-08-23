@@ -27,37 +27,10 @@
             z-index: 100;
             pointer-events: none;
             text-shadow: 0 0 10px #00ffcc;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 5px;
         }
-
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 100;
-            display: none;
-        }
-
-            #crosshair::before, #crosshair::after {
-                content: '';
-                position: absolute;
-                background: white;
-            }
-
-            #crosshair::before {
-                width: 2px;
-                height: 20px;
-                left: 9px;
-            }
-
-            #crosshair::after {
-                width: 20px;
-                height: 2px;
-                top: 9px;
-            }
 
         #planet-info {
             position: absolute;
@@ -71,20 +44,19 @@
             border-radius: 5px;
         }
 
-        #inventory {
+        #controls {
             position: absolute;
             bottom: 15px;
-            right: 15px;
-            color: white;
-            font-size: 14px;
+            left: 15px;
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
             z-index: 100;
-            background: rgba(0,0,0,0.8);
-            padding: 15px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
             border-radius: 5px;
-            display: none;
         }
 
-        #weather-effect {
+        #weather-overlay {
             position: absolute;
             top: 0;
             left: 0;
@@ -92,33 +64,31 @@
             height: 100%;
             pointer-events: none;
             z-index: 50;
-            display: none;
         }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div>🚀 СКОРОСТЬ: <span id="speed">0</span> км/с</div>
-        <div>📡 ВЫСОТА: <span id="altitude">0</span> км</div>
-        <div>🎯 РЕЖИМ: <span id="mode">ПОЛЁТ</span></div>
-        <div>️ ТЕМПЕРАТУРА: <span id="temp">0</span>°C</div>
+        <div> СКОРОСТЬ: <span id="speed">0</span> км/с</div>
+        <div>📡 РАССТОЯНИЕ: <span id="altitude">0</span> км</div>
+        <div>️ ТЕМПЕРАТУРА: <span id="temp">20</span>°C</div>
     </div>
-    <div id="crosshair"></div>
     <div id="planet-info">
         <b>ПЛАНЕТА:</b> <span id="planet-name">Земля</span><br>
-        <div>️ ПОГОДА: <span id="weather">Ясно</span></div>
-        <div>📍 Планет: <span id="planet-count">3</span></div>
+        <div>🌦️ ПОГОДА: <span id="weather">Ясно</span></div>
+        <div>📦 Вокселей: <span id="voxel-count">0</span></div>
     </div>
-    <div id="inventory">
-        <b>ИНВЕНТАРЬ:</b>
-        <div>💎 Кристаллы: <span id="crystals">0</span></div>
-        <div>⛏️ Блоки: <span id="blocks">0</span></div>
+    <div id="controls">
+        <b>УПРАВЛЕНИЕ:</b> W (газ), A/D (крен), Мышь (поворот)<br>
+        Летайте между 4 планетами!
     </div>
-    <canvas id="weather-effect"></canvas>
+    <canvas id="weather-overlay"></canvas>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
+        console.log('=== ЗАПУСК ИГРЫ ===');
+
         // ШУМ ПЕРЛИНА
         class SimplexNoise {
             constructor() {
@@ -154,200 +124,203 @@
 
         const simplex = new SimplexNoise();
 
-        // ТИПЫ ПЛАНЕТ С ПОГОДОЙ
+        // ТИПЫ ПЛАНЕТ
         const planetTypes = {
             earth: {
                 name: 'Земля',
-                colors: { grass: 0x3d8e3d, dirt: 0x6e5a3d, stone: 0x666666, water: 0x1a3d6e, snow: 0xffffff },
-                weather: ['clear', 'rain', 'cloudy'],
+                weather: ['Ясно', 'Дождь', 'Облачно'],
                 temp: 20,
-                gravity: 0.02
+                colors: {
+                    water: 0x1a3d6e,
+                    sand: 0xd4c08a,
+                    grass: 0x3d8e3d,
+                    forest: 0x2d5a2d,
+                    stone: 0x666666,
+                    snow: 0xffffff
+                }
             },
             desert: {
                 name: 'Пустыня',
-                colors: { sand: 0xd4a574, stone: 0x8B7355, cactus: 0x2d5a2d, sky: 0xffaa55 },
-                weather: ['clear', 'sandstorm', 'hot'],
+                weather: ['Ясно', 'Песчаная буря', 'Жара'],
                 temp: 45,
-                gravity: 0.018
+                colors: {
+                    sand: 0xd4a574,
+                    darkSand: 0xb8864a,
+                    rock: 0x8B7355,
+                    cactus: 0x2d5a2d
+                }
             },
             ice: {
                 name: 'Ледяная',
-                colors: { ice: 0x88ccff, snow: 0xffffff, stone: 0x556677, water: 0x4488aa },
-                weather: ['snow', 'blizzard', 'clear'],
+                weather: ['Снег', 'Метель', 'Ясно'],
                 temp: -30,
-                gravity: 0.015
+                colors: {
+                    ice: 0x88ccff,
+                    snow: 0xffffff,
+                    darkIce: 0x4488aa,
+                    rock: 0x556677
+                }
             },
             lava: {
                 name: 'Вулканическая',
-                colors: { lava: 0xff4400, rock: 0x222222, ash: 0x333333, fire: 0xff6600 },
-                weather: ['ash', 'eruption', 'clear'],
+                weather: ['Пепел', 'Извержение', 'Ясно'],
                 temp: 200,
-                gravity: 0.025
+                colors: {
+                    lava: 0xff4400,
+                    hotLava: 0xffaa00,
+                    rock: 0x222222,
+                    ash: 0x333333
+                }
             }
         };
 
-        // ВОКСЕЛЬНАЯ ГЕНЕРАЦИЯ
-        function generateVoxelPlanet(planetType, radius, detail) {
-            const voxels = [];
-            const blockSize = 2;
-            const colors = planetType.colors;
-
-            for (let x = -radius; x <= radius; x += blockSize) {
-                for (let z = -radius; z <= radius; z += blockSize) {
-                    for (let y = -radius; y <= radius; y += blockSize) {
-                        const dist = Math.sqrt(x * x + y * y + z * z);
-                        const noise = simplex.noise3D(x * 0.02, y * 0.02, z * 0.02);
-                        const surfaceDist = radius + noise * 10;
-
-                        if (dist <= surfaceDist && dist > surfaceDist - 10) {
-                            let color;
-                            if (planetType === 'earth') {
-                                if (dist > surfaceDist - 1) color = noise > 0.3 ? colors.grass : colors.dirt;
-                                else if (noise < -0.3) color = colors.water;
-                                else color = colors.stone;
-                            } else if (planetType === 'desert') {
-                                color = dist > surfaceDist - 1 ? colors.sand : colors.stone;
-                            } else if (planetType === 'ice') {
-                                color = dist > surfaceDist - 1 ? colors.ice : colors.stone;
-                            } else if (planetType === 'lava') {
-                                color = dist > surfaceDist - 2 ? colors.lava : colors.rock;
-                            }
-
-                            if (color !== undefined) {
-                                voxels.push({ x, y, z, color, size: blockSize });
-                            }
-                        }
-                    }
-                }
-            }
-            return voxels;
-        }
-
-        // СИСТЕМА ПОГОДЫ
-        class WeatherSystem {
-            constructor(scene, camera) {
-                this.scene = scene;
-                this.camera = camera;
-                this.particles = [];
-                this.canvas = document.getElementById('weather-effect');
-                this.ctx = this.canvas.getContext('2d');
-                this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight;
-                this.currentWeather = 'clear';
-                this.intensity = 0;
-            }
-
-            setWeather(type, intensity) {
-                this.currentWeather = type;
-                this.intensity = intensity;
-                this.canvas.style.display = type !== 'clear' ? 'block' : 'none';
-
-                // Создаём частицы
-                this.particles = [];
-                const count = intensity * 1000;
-
-                for (let i = 0; i < count; i++) {
-                    this.particles.push({
-                        x: Math.random() * this.canvas.width,
-                        y: Math.random() * this.canvas.height,
-                        z: Math.random() * 100,
-                        vx: (Math.random() - 0.5) * 2,
-                        vy: type === 'snow' ? 1 + Math.random() : 5 + Math.random() * 5,
-                        size: Math.random() * 3 + 1
-                    });
-                }
-            }
-
-            update() {
-                if (this.currentWeather === 'clear') return;
-
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                // Цвет частиц в зависимости от погоды
-                let color;
-                if (this.currentWeather === 'rain') color = 'rgba(100, 150, 255, 0.6)';
-                else if (this.currentWeather === 'snow') color = 'rgba(255, 255, 255, 0.8)';
-                else if (this.currentWeather === 'sandstorm') color = 'rgba(210, 180, 140, 0.4)';
-                else if (this.currentWeather === 'blizzard') color = 'rgba(200, 220, 255, 0.5)';
-                else if (this.currentWeather === 'ash') color = 'rgba(50, 50, 50, 0.6)';
-                else return;
-
-                this.ctx.fillStyle = color;
-
-                this.particles.forEach(p => {
-                    p.y += p.vy;
-                    p.x += p.vx;
-
-                    if (p.y > this.canvas.height) {
-                        p.y = -10;
-                        p.x = Math.random() * this.canvas.width;
-                    }
-
-                    this.ctx.beginPath();
-                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                    this.ctx.fill();
-                });
-            }
-        }
-
         // СЦЕНА
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x000000, 50, 500);
+        scene.fog = new THREE.Fog(0x000000, 200, 1500);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
-        // ОСВЕЩЕНИЕ
-        const ambientLight = new THREE.AmbientLight(0x404040, 1);
-        scene.add(ambientLight);
+        // СВЕТ
+        scene.add(new THREE.AmbientLight(0x404040, 1.2));
         const sun = new THREE.DirectionalLight(0xffffff, 1.5);
-        sun.position.set(100, 100, 100);
-        sun.castShadow = true;
+        sun.position.set(200, 200, 200);
         scene.add(sun);
 
-        // МНОЖЕСТВО ПЛАНЕТ
-        const planets = [];
-        const planetData = [
-            { type: 'earth', position: [0, 0, 0], radius: 50 },
-            { type: 'desert', position: [300, 50, 0], radius: 40 },
-            { type: 'ice', position: [-300, 30, 100], radius: 45 },
-            { type: 'lava', position: [0, -200, 200], radius: 35 }
-        ];
-
-        planetData.forEach(data => {
-            const voxels = generateVoxelPlanet(data.type, data.radius, 2);
-            const geometry = new THREE.BoxGeometry(2, 2, 2);
+        // ФУНКЦИЯ СОЗДАНИЯ ВОКСЕЛЬНОЙ ПЛАНЕТЫ С INSTANCEDMESH
+        function createVoxelPlanet(type, radius, position) {
             const planetGroup = new THREE.Group();
+            const blockSize = 3;
+            const info = planetTypes[type];
+            const colors = info.colors;
+            const colorKeys = Object.keys(colors);
 
-            voxels.forEach(v => {
-                const material = new THREE.MeshPhongMaterial({ color: v.color });
-                const voxel = new THREE.Mesh(geometry, material);
-                voxel.position.set(v.x, v.y, v.z);
-                voxel.castShadow = true;
-                voxel.receiveShadow = true;
-                planetGroup.add(voxel);
+            // Создаём InstancedMesh для каждого цвета
+            const meshes = {};
+            const maxInstances = 1500; // Максимум вокселей одного цвета
+
+            colorKeys.forEach(key => {
+                const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+                const material = new THREE.MeshPhongMaterial({
+                    color: colors[key],
+                    flatShading: true,
+                    shininess: 10
+                });
+                const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.count = 0; // Пока нет инстансов
+                meshes[key] = { mesh, count: 0 };
+                planetGroup.add(mesh);
             });
 
-            planetGroup.position.set(...data.position);
+            // Генерация вокселей по сфере
+            const totalVoxels = 3000;
+            const dummy = new THREE.Object3D();
+
+            for (let i = 0; i < totalVoxels; i++) {
+                // Равномерное распределение по сфере (алгоритм Фибоначчи)
+                const phi = Math.acos(1 - 2 * (i + 0.5) / totalVoxels);
+                const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+
+                const x = Math.sin(phi) * Math.cos(theta);
+                const y = Math.sin(phi) * Math.sin(theta);
+                const z = Math.cos(phi);
+
+                // Шум для рельефа
+                const noise1 = simplex.noise3D(x * 2, y * 2, z * 2);
+                const noise2 = simplex.noise3D(x * 4, y * 4, z * 4) * 0.5;
+                const noise3 = simplex.noise3D(x * 8, y * 8, z * 8) * 0.25;
+                const totalNoise = noise1 + noise2 + noise3;
+
+                const surfaceRadius = radius + totalNoise * 8;
+
+                const finalX = x * surfaceRadius;
+                const finalY = y * surfaceRadius;
+                const finalZ = z * surfaceRadius;
+
+                // Выбор цвета по высоте
+                let colorKey;
+                const heightRatio = (surfaceRadius - radius) / 8;
+
+                if (type === 'earth') {
+                    if (heightRatio < -0.3) colorKey = 'water';
+                    else if (heightRatio < -0.1) colorKey = 'sand';
+                    else if (heightRatio < 0.3) colorKey = 'grass';
+                    else if (heightRatio < 0.6) colorKey = 'forest';
+                    else if (heightRatio < 0.8) colorKey = 'stone';
+                    else colorKey = 'snow';
+                } else if (type === 'desert') {
+                    if (heightRatio < 0) colorKey = 'darkSand';
+                    else if (heightRatio < 0.5) colorKey = 'sand';
+                    else if (heightRatio < 0.8) colorKey = 'rock';
+                    else colorKey = 'cactus';
+                } else if (type === 'ice') {
+                    if (heightRatio < -0.2) colorKey = 'darkIce';
+                    else if (heightRatio < 0.3) colorKey = 'ice';
+                    else if (heightRatio < 0.7) colorKey = 'snow';
+                    else colorKey = 'rock';
+                } else if (type === 'lava') {
+                    if (heightRatio < -0.3) colorKey = 'rock';
+                    else if (heightRatio < 0.2) colorKey = 'ash';
+                    else if (heightRatio < 0.6) colorKey = 'lava';
+                    else colorKey = 'hotLava';
+                }
+
+                if (!colorKey) colorKey = colorKeys[0];
+
+                // Устанавливаем матрицу инстанса
+                dummy.position.set(finalX, finalY, finalZ);
+                dummy.lookAt(0, 0, 0);
+                dummy.updateMatrix();
+
+                const meshData = meshes[colorKey];
+                if (meshData.count < maxInstances) {
+                    meshData.mesh.setMatrixAt(meshData.count, dummy.matrix);
+                    meshData.count++;
+                }
+            }
+
+            // Обновляем счётчики
+            colorKeys.forEach(key => {
+                meshes[key].mesh.count = meshes[key].count;
+                meshes[key].mesh.instanceMatrix.needsUpdate = true;
+            });
+
+            planetGroup.position.set(...position);
             scene.add(planetGroup);
 
-            planets.push({
+            const totalVoxelCount = colorKeys.reduce((sum, key) => sum + meshes[key].count, 0);
+
+            return {
                 mesh: planetGroup,
-                type: planetTypes[data.type],
-                position: new THREE.Vector3(...data.position),
-                radius: data.radius
-            });
-        });
+                type: info,
+                position: new THREE.Vector3(...position),
+                radius: radius,
+                voxelCount: totalVoxelCount
+            };
+        }
+
+        // СОЗДАЁМ 4 ПЛАНЕТЫ
+        const planets = [];
+        planets.push(createVoxelPlanet('earth', 50, [0, 0, 0]));
+        planets.push(createVoxelPlanet('desert', 45, [250, 50, 0]));
+        planets.push(createVoxelPlanet('ice', 48, [-250, 30, 150]));
+        planets.push(createVoxelPlanet('lava', 40, [0, -200, 250]));
+
+        const totalVoxels = planets.reduce((sum, p) => sum + p.voxelCount, 0);
+        document.getElementById('voxel-count').innerText = totalVoxels;
+        console.log('Планеты созданы. Всего вокселей:', totalVoxels);
 
         // ЗВЁЗДЫ
         const starsGeo = new THREE.BufferGeometry();
         const starsPos = new Float32Array(5000 * 3);
-        for (let i = 0; i < 5000 * 3; i++) starsPos[i] = (Math.random() - 0.5) * 5000;
+        for (let i = 0; i < 5000 * 3; i++) starsPos[i] = (Math.random() - 0.5) * 4000;
         starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
-        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 })));
+        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2 })));
 
         // КОРАБЛЬ
         const ship = new THREE.Group();
@@ -358,7 +331,6 @@
             new THREE.MeshPhongMaterial({ color: 0xdddddd, shininess: 50 })
         );
         body.rotation.x = Math.PI / 2;
-        body.castShadow = true;
         ship.add(body);
 
         const nose = new THREE.Mesh(
@@ -394,19 +366,71 @@
         flame2.visible = false;
         ship.add(flame2);
 
-        ship.position.set(0, 100, 0);
+        ship.position.set(0, 120, 0);
 
         // КАМЕРА
         camera.position.set(0, 5, 20);
         ship.add(camera);
 
-        // ПОГОДА
-        const weatherSystem = new WeatherSystem(scene, camera);
+        // СИСТЕМА ПОГОДЫ (Canvas overlay)
+        const weatherCanvas = document.getElementById('weather-overlay');
+        const weatherCtx = weatherCanvas.getContext('2d');
+        weatherCanvas.width = window.innerWidth;
+        weatherCanvas.height = window.innerHeight;
+
+        let weatherParticles = [];
+        let currentWeather = 'Ясно';
+
+        function setWeather(type) {
+            currentWeather = type;
+            weatherParticles = [];
+            const count = type === 'Ясно' ? 0 : 500;
+
+            for (let i = 0; i < count; i++) {
+                weatherParticles.push({
+                    x: Math.random() * weatherCanvas.width,
+                    y: Math.random() * weatherCanvas.height,
+                    speed: type === 'Дождь' ? 15 : type === 'Снег' ? 3 : type === 'Метель' ? 8 : 5,
+                    size: Math.random() * 3 + 1
+                });
+            }
+        }
+
+        function updateWeather() {
+            weatherCtx.clearRect(0, 0, weatherCanvas.width, weatherCanvas.height);
+
+            if (currentWeather === 'Ясно') return;
+
+            let color;
+            if (currentWeather === 'Дождь') color = 'rgba(100, 150, 255, 0.5)';
+            else if (currentWeather === 'Снег' || currentWeather === 'Метель') color = 'rgba(255, 255, 255, 0.7)';
+            else if (currentWeather === 'Песчаная буря') color = 'rgba(210, 180, 140, 0.3)';
+            else if (currentWeather === 'Пепел') color = 'rgba(80, 80, 80, 0.5)';
+            else if (currentWeather === 'Облачно') color = 'rgba(200, 200, 200, 0.1)';
+            else if (currentWeather === 'Жара') color = 'rgba(255, 200, 100, 0.15)';
+            else if (currentWeather === 'Извержение') color = 'rgba(255, 100, 0, 0.2)';
+
+            weatherCtx.fillStyle = color;
+
+            weatherParticles.forEach(p => {
+                p.y += p.speed;
+                p.x += (Math.random() - 0.5) * 2;
+
+                if (p.y > weatherCanvas.height) {
+                    p.y = -10;
+                    p.x = Math.random() * weatherCanvas.width;
+                }
+
+                weatherCtx.beginPath();
+                weatherCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                weatherCtx.fill();
+            });
+        }
 
         // УПРАВЛЕНИЕ
         let speed = 0;
         const keys = {};
-        let currentPlanet = planets[0];
+        let weatherTimer = 0;
 
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
@@ -427,6 +451,8 @@
             }
         });
 
+        console.log('=== ИГРА ГОТОВА ===');
+
         // ЦИКЛ
         function animate() {
             requestAnimationFrame(animate);
@@ -440,6 +466,15 @@
 
             ship.translateZ(-speed);
 
+            // Крен
+            if (keys['KeyA'] || keys['ArrowLeft']) {
+                ship.rotation.z += (0.5 - ship.rotation.z) * 0.1;
+            } else if (keys['KeyD'] || keys['ArrowRight']) {
+                ship.rotation.z += (-0.5 - ship.rotation.z) * 0.1;
+            } else {
+                ship.rotation.z += (0 - ship.rotation.z) * 0.1;
+            }
+
             // Двигатели
             if (speed > 0.3) {
                 flame1.visible = true;
@@ -451,33 +486,38 @@
                 flame2.visible = false;
             }
 
-            // Определение ближайшей планеты и погоды
+            // Определение ближайшей планеты
             let minDist = Infinity;
+            let currentPlanet = planets[0];
+
             planets.forEach(planet => {
                 const dist = ship.position.distanceTo(planet.position);
                 if (dist < minDist) {
                     minDist = dist;
                     currentPlanet = planet;
                 }
+                planet.mesh.rotation.y += 0.0005;
             });
 
-            // Обновление погоды
-            const weatherIndex = Math.floor(Math.random() * currentPlanet.type.weather.length);
-            const weather = currentPlanet.type.weather[weatherIndex];
-            const weatherNames = { clear: 'Ясно', rain: 'Дождь', snow: 'Снег', sandstorm: 'Песчаная буря', blizzard: 'Метель', ash: 'Пепел', cloudy: 'Облачно', hot: 'Жара', eruption: 'Извержение' };
+            // Смена погоды
+            weatherTimer++;
+            if (weatherTimer > 400) {
+                weatherTimer = 0;
+                const weatherIndex = Math.floor(Math.random() * currentPlanet.type.weather.length);
+                const newWeather = currentPlanet.type.weather[weatherIndex];
+                if (newWeather !== currentWeather) {
+                    setWeather(newWeather);
+                    document.getElementById('weather').innerText = newWeather;
+                }
+            }
 
-            weatherSystem.setWeather(weather, 0.5);
-            weatherSystem.update();
+            updateWeather();
 
             // UI
             document.getElementById('speed').innerText = (speed * 100).toFixed(0);
             document.getElementById('altitude').innerText = minDist.toFixed(0);
             document.getElementById('planet-name').innerText = currentPlanet.type.name;
-            document.getElementById('weather').innerText = weatherNames[weather] || weather;
             document.getElementById('temp').innerText = currentPlanet.type.temp;
-
-            // Вращение планет
-            planets.forEach(p => p.mesh.rotation.y += 0.0005);
 
             renderer.render(scene, camera);
         }
@@ -486,6 +526,8 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            weatherCanvas.width = window.innerWidth;
+            weatherCanvas.height = window.innerHeight;
         });
 
         animate();
