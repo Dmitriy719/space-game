@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Aetherbound - Voxel Survival</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aetherbound - Multi-Planet Explorer</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +14,7 @@
         body {
             overflow: hidden;
             background: #000;
-            font-family: 'Courier New', monospace;
+            font-family: 'Segoe UI', Arial, sans-serif;
             user-select: none;
         }
 
@@ -30,9 +30,9 @@
             color: #fff;
             font-size: 14px;
             z-index: 100;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
             pointer-events: none;
         }
 
@@ -45,6 +45,7 @@
             height: 24px;
             pointer-events: none;
             z-index: 100;
+            display: none;
         }
 
             #crosshair::before, #crosshair::after {
@@ -67,83 +68,112 @@
                 left: 0;
             }
 
-        #hotbar {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 4px;
-            z-index: 100;
-        }
-
-        .hotbar-slot {
-            width: 50px;
-            height: 50px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #555;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 20px;
-            position: relative;
-        }
-
-            .hotbar-slot.active {
-                border-color: #fff;
-                background: rgba(255,255,255,0.2);
-            }
-
         #instructions {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            font-size: 18px;
-            background: rgba(0,0,0,0.9);
-            padding: 30px;
-            border-radius: 10px;
+            font-size: 16px;
+            background: rgba(0,0,0,0.95);
+            padding: 40px;
+            border-radius: 15px;
             z-index: 200;
             text-align: center;
             cursor: pointer;
+            border: 2px solid #00ffcc;
         }
 
             #instructions h1 {
                 margin-bottom: 20px;
                 color: #00ffcc;
+                font-size: 32px;
             }
 
             #instructions p {
-                margin: 10px 0;
+                margin: 12px 0;
+                line-height: 1.6;
+            }
+
+        #mode-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #00ffcc;
+            font-size: 16px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+
+        #planet-selector {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .planet-btn {
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #555;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+            .planet-btn:hover {
+                border-color: #00ffcc;
+                background: rgba(0,255,204,0.2);
             }
     </style>
 </head>
 <body>
     <div id="instructions">
-        <h1>🎮 AETHERBOUND</h1>
+        <h1>🚀 AETHERBOUND</h1>
         <p><b>Кликните чтобы начать</b></p>
-        <p>WASD - движение | Пробел - прыжок</p>
-        <p>Shift - бег | ЛКМ - ломать | ПКМ - ставить</p>
-        <p>1-5 - выбор блока | F - полёт/ходьба</p>
-        <p>ESC - меню</p>
+        <p><b>УПРАВЛЕНИЕ КОРАБЛЁМ:</b></p>
+        <p>W - ускорение | S - торможение</p>
+        <p>Мышь - поворот корабля</p>
+        <p>E - выйти из корабля (на поверхности планеты)</p>
+        <p><b>УПРАВЛЕНИЕ ПЕРСОНАЖЕМ:</b></p>
+        <p>WASD - движение | Shift - бег | Пробел - прыжок</p>
+        <p>ЛКМ - ломать блок | ПКМ - ставить блок</p>
+        <p>E - сесть в корабль</p>
+        <p><b>ПЕРЕМЕЩЕНИЕ МЕЖДУ ПЛАНЕТАМИ:</b></p>
+        <p>1-4 - телепорт к планете</p>
     </div>
 
     <div id="ui">
-        <div>🎯 РЕЖИМ: <span id="mode">ХОДЬБА</span></div>
-        <div>📍 ПОЗИЦИЯ: <span id="position">0, 0, 0</span></div>
+        <div>🎯 РЕЖИМ: <span id="mode">КОРАБЛЬ</span></div>
+        <div> ПОЗИЦИЯ: <span id="position">0, 0, 0</span></div>
+        <div>🌍 ПЛАНЕТА: <span id="current-planet">Космос</span></div>
         <div>⚡ FPS: <span id="fps">0</span></div>
+    </div>
+
+    <div id="mode-indicator">
+        <div id="ship-ui">
+            <div>🚀 СКОРОСТЬ: <span id="ship-speed">0</span></div>
+            <div>Нажмите <b>E</b> чтобы выйти</div>
+        </div>
+        <div id="walk-ui" style="display:none;">
+            <div>🧍 ХОДЬБА</div>
+            <div>Нажмите <b>E</b> чтобы сесть в корабль</div>
+        </div>
     </div>
 
     <div id="crosshair"></div>
 
-    <div id="hotbar">
-        <div class="hotbar-slot active" data-slot="0">🟫</div>
-        <div class="hotbar-slot" data-slot="1">🟩</div>
-        <div class="hotbar-slot" data-slot="2">⬜</div>
-        <div class="hotbar-slot" data-slot="3"></div>
-        <div class="hotbar-slot" data-slot="4">🟨</div>
+    <div id="planet-selector">
+        <button class="planet-btn" onclick="teleportToPlanet(0)">🌍 Земля (1)</button>
+        <button class="planet-btn" onclick="teleportToPlanet(1)">️ Пустыня (2)</button>
+        <button class="planet-btn" onclick="teleportToPlanet(2)">❄️ Лёд (3)</button>
+        <button class="planet-btn" onclick="teleportToPlanet(3)">🌋 Лава (4)</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -189,10 +219,10 @@
         const CHUNK_SIZE = 16;
         const RENDER_DISTANCE = 3;
         const BLOCK_SIZE = 1;
-        const GRAVITY = 0.02;
-        const JUMP_FORCE = 0.35;
-        const WALK_SPEED = 0.12;
-        const RUN_SPEED = 0.22;
+        const GRAVITY = 0.015;
+        const JUMP_FORCE = 0.3;
+        const WALK_SPEED = 0.1;
+        const RUN_SPEED = 0.18;
 
         const BLOCK_TYPES = {
             DIRT: { color: 0x8B4513 },
@@ -202,12 +232,19 @@
             SAND: { color: 0xF4A460 }
         };
 
+        // ТИПЫ ПЛАНЕТ
+        const PLANET_TYPES = [
+            { name: 'Земля', colors: { surface: 0x228B22, underground: 0x8B4513 }, skyColor: 0x87CEEB },
+            { name: 'Пустыня', colors: { surface: 0xF4A460, underground: 0xD2691E }, skyColor: 0xFFD700 },
+            { name: 'Лёд', colors: { surface: 0xADD8E6, underground: 0x4682B4 }, skyColor: 0xE0FFFF },
+            { name: 'Лава', colors: { surface: 0xFF4500, underground: 0x8B0000 }, skyColor: 0x2F0000 }
+        ];
+
         // СЦЕНА
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 30, 100);
+        scene.background = new THREE.Color(0x000000);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
@@ -215,50 +252,59 @@
 
         // ОСВЕЩЕНИЕ
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-        sun.position.set(50, 100, 50);
-        sun.castShadow = true;
-        sun.shadow.camera.left = -50;
-        sun.shadow.camera.right = 50;
-        sun.shadow.camera.top = 50;
-        sun.shadow.camera.bottom = -50;
-        sun.shadow.mapSize.width = 2048;
-        sun.shadow.mapSize.height = 2048;
-        scene.add(sun);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        sunLight.position.set(100, 150, 100);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
 
-        // МИР
+        // ЗВЁЗДЫ
+        const starsGeo = new THREE.BufferGeometry();
+        const starsPos = new Float32Array(5000 * 3);
+        for (let i = 0; i < 5000 * 3; i++) starsPos[i] = (Math.random() - 0.5) * 4000;
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
+        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2 })));
+
+        // ПЛАНЕТЫ (сферы в космосе)
+        const planets = [];
+        const planetPositions = [
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(500, 0, 0),
+            new THREE.Vector3(-500, 0, 0),
+            new THREE.Vector3(0, 0, 500)
+        ];
+
+        planetPositions.forEach((pos, i) => {
+            const planetType = PLANET_TYPES[i];
+            const planetSphere = new THREE.Mesh(
+                new THREE.SphereGeometry(80, 32, 32),
+                new THREE.MeshPhongMaterial({ color: planetType.colors.surface })
+            );
+            planetSphere.position.copy(pos);
+            scene.add(planetSphere);
+            planets.push({ mesh: planetSphere, type: planetType, position: pos });
+        });
+
+        // ЧАНКИ (генерируются вокруг игрока на поверхности планеты)
         const chunks = new Map();
         const chunkMeshes = new Map();
         const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 
         const blockMaterials = {};
         Object.keys(BLOCK_TYPES).forEach(key => {
-            blockMaterials[key] = new THREE.MeshLambertMaterial({ color: BLOCK_TYPES[key].color });
+            blockMaterials[key] = new THREE.MeshStandardMaterial({ color: BLOCK_TYPES[key].color });
         });
 
         function getChunkKey(cx, cz) { return `${cx},${cz}`; }
 
-        function getHeight(wx, wz) {
-            const scale = 0.08;
+        function getHeight(wx, wz, planetType) {
+            const scale = 0.05;
             let h = 0;
             h += noise.noise3D(wx * scale, 0, wz * scale) * 8;
             h += noise.noise3D(wx * scale * 2, 0, wz * scale * 2) * 4;
-            h += noise.noise3D(wx * scale * 4, 0, wz * scale * 4) * 2;
             return Math.floor(h);
         }
 
-        function getBlockType(wx, wz, wy, height) {
-            if (wy < height - 3) return 'STONE';
-            if (wy < height) return 'DIRT';
-            if (wy === height) {
-                if (height < -2) return 'WATER';
-                if (height < 0) return 'SAND';
-                return 'GRASS';
-            }
-            return null;
-        }
-
-        function generateChunk(cx, cz) {
+        function generateChunk(cx, cz, planetType) {
             const key = getChunkKey(cx, cz);
             if (chunks.has(key)) return;
 
@@ -270,13 +316,11 @@
                 for (let z = 0; z < CHUNK_SIZE; z++) {
                     const wx = startX + x;
                     const wz = startZ + z;
-                    const height = getHeight(wx, wz);
+                    const height = getHeight(wx, wz, planetType);
 
-                    for (let y = height - 5; y <= height + 1; y++) {
-                        const blockType = getBlockType(wx, wz, y, height);
-                        if (blockType) {
-                            chunk[`${wx},${y},${wz}`] = blockType;
-                        }
+                    for (let y = height - 3; y <= height; y++) {
+                        const blockType = y === height ? 'GRASS' : 'DIRT';
+                        chunk[`${wx},${y},${wz}`] = blockType;
                     }
                 }
             }
@@ -320,13 +364,13 @@
             chunkMeshes.set(key, meshes);
         }
 
-        function updateChunks(playerX, playerZ) {
+        function updateChunks(playerX, playerZ, planetType) {
             const pcx = Math.floor(playerX / CHUNK_SIZE);
             const pcz = Math.floor(playerZ / CHUNK_SIZE);
 
             for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
                 for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                    generateChunk(pcx + dx, pcz + dz);
+                    generateChunk(pcx + dx, pcz + dz, planetType);
                 }
             }
 
@@ -340,71 +384,73 @@
             });
         }
 
-        // ПЕРСОНАЖ (вид от третьего лица)
+        // ПЕРСОНАЖ
         const player = new THREE.Group();
         scene.add(player);
 
-        // Тело
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(0.6, 1.2, 0.4),
-            new THREE.MeshLambertMaterial({ color: 0x4444ff })
+            new THREE.MeshStandardMaterial({ color: 0x4444ff })
         );
         body.position.y = 0.6;
         body.castShadow = true;
         player.add(body);
 
-        // Голова
         const head = new THREE.Mesh(
             new THREE.BoxGeometry(0.5, 0.5, 0.5),
-            new THREE.MeshLambertMaterial({ color: 0xffcc99 })
+            new THREE.MeshStandardMaterial({ color: 0xffcc99 })
         );
         head.position.y = 1.45;
         head.castShadow = true;
         player.add(head);
 
-        // Руки
-        const armGeo = new THREE.BoxGeometry(0.2, 0.8, 0.2);
-        const armMat = new THREE.MeshLambertMaterial({ color: 0x4444ff });
-        const leftArm = new THREE.Mesh(armGeo, armMat);
-        leftArm.position.set(-0.4, 0.8, 0);
-        leftArm.castShadow = true;
-        player.add(leftArm);
-
-        const rightArm = new THREE.Mesh(armGeo, armMat);
-        rightArm.position.set(0.4, 0.8, 0);
-        rightArm.castShadow = true;
-        player.add(rightArm);
-
-        // Ноги
-        const legGeo = new THREE.BoxGeometry(0.25, 0.8, 0.25);
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x2222aa });
-        const leftLeg = new THREE.Mesh(legGeo, legMat);
-        leftLeg.position.set(-0.15, 0, 0);
-        leftLeg.castShadow = true;
-        player.add(leftLeg);
-
-        const rightLeg = new THREE.Mesh(legGeo, legMat);
-        rightLeg.position.set(0.15, 0, 0);
-        rightLeg.castShadow = true;
-        player.add(rightLeg);
-
         player.position.set(0, 20, 0);
+        player.visible = false;
 
-        // Камера (следует за игроком)
-        const cameraOffset = new THREE.Vector3(0, 3, 6);
+        // КОРАБЛЬ
+        const ship = new THREE.Group();
+        scene.add(ship);
+
+        const shipBody = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.5, 2, 8, 8),
+            new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 })
+        );
+        shipBody.rotation.x = Math.PI / 2;
+        ship.add(shipBody);
+
+        const shipNose = new THREE.Mesh(
+            new THREE.ConeGeometry(1.5, 4, 8),
+            new THREE.MeshStandardMaterial({ color: 0xff4444, metalness: 0.9 })
+        );
+        shipNose.rotation.x = Math.PI / 2;
+        shipNose.position.z = -6;
+        ship.add(shipNose);
+
+        const shipWings = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 0.3, 3),
+            new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7 })
+        );
+        shipWings.position.z = 1;
+        ship.add(shipWings);
+
+        ship.position.set(0, 100, 0);
 
         // УПРАВЛЕНИЕ
         const keys = {};
         let isPointerLocked = false;
-        let selectedSlot = 0;
-        let gameMode = 'walk';
+        let gameMode = 'ship';
+        let currentPlanetIndex = 0;
 
         const playerState = {
             velocity: new THREE.Vector3(0, 0, 0),
             onGround: false,
             rotation: 0,
-            cameraAngle: 0,
-            cameraPitch: 0.3
+            cameraAngle: 0
+        };
+
+        const shipState = {
+            speed: 0,
+            rotation: 0
         };
 
         document.getElementById('instructions').addEventListener('click', () => {
@@ -418,66 +464,63 @@
 
         document.addEventListener('mousemove', (e) => {
             if (!isPointerLocked) return;
-            playerState.cameraAngle -= e.movementX * 0.003;
-            playerState.cameraPitch -= e.movementY * 0.003;
-            playerState.cameraPitch = Math.max(-0.5, Math.min(1.2, playerState.cameraPitch));
+            if (gameMode === 'ship') {
+                shipState.rotation -= e.movementX * 0.003;
+            } else {
+                playerState.cameraAngle -= e.movementX * 0.003;
+            }
         });
 
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-            if (e.code >= 'Digit1' && e.code <= 'Digit5') {
-                selectedSlot = parseInt(e.code.charAt(5)) - 1;
-                document.querySelectorAll('.hotbar-slot').forEach((slot, i) => {
-                    slot.classList.toggle('active', i === selectedSlot);
-                });
+
+            if (e.code === 'KeyE') {
+                if (gameMode === 'ship') {
+                    // Выйти из корабля
+                    gameMode = 'walk';
+                    player.visible = true;
+                    player.position.copy(ship.position);
+                    player.position.y = 20;
+                    ship.visible = false;
+                    document.getElementById('mode').innerText = 'ХОДЬБА';
+                    document.getElementById('ship-ui').style.display = 'none';
+                    document.getElementById('walk-ui').style.display = 'block';
+                    document.getElementById('crosshair').style.display = 'block';
+                } else {
+                    // Сесть в корабль
+                    gameMode = 'ship';
+                    player.visible = false;
+                    ship.visible = true;
+                    ship.position.copy(player.position);
+                    ship.position.y += 3;
+                    document.getElementById('mode').innerText = 'КОРАБЛЬ';
+                    document.getElementById('ship-ui').style.display = 'block';
+                    document.getElementById('walk-ui').style.display = 'none';
+                    document.getElementById('crosshair').style.display = 'none';
+                }
             }
-            if (e.code === 'KeyF') {
-                gameMode = gameMode === 'walk' ? 'fly' : 'walk';
-                document.getElementById('mode').innerText = gameMode === 'walk' ? 'ХОДЬБА' : 'ПОЛЁТ';
-                playerState.velocity.set(0, 0, 0);
+
+            // Телепорт к планетам
+            if (e.code >= 'Digit1' && e.code <= 'Digit4') {
+                const planetIndex = parseInt(e.code.charAt(5)) - 1;
+                teleportToPlanet(planetIndex);
             }
         });
 
         document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // Raycaster
-        const raycaster = new THREE.Raycaster();
-        raycaster.far = 6;
+        function teleportToPlanet(index) {
+            currentPlanetIndex = index;
+            const planet = planets[index];
+            ship.position.copy(planet.position);
+            ship.position.y += 100;
+            shipState.speed = 0;
+            player.position.copy(ship.position);
+            player.position.y = 20;
+            document.getElementById('current-planet').innerText = planet.type.name;
+            scene.background = new THREE.Color(planet.type.skyColor);
+        }
 
-        document.addEventListener('mousedown', (e) => {
-            if (!isPointerLocked) return;
-
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const allMeshes = [];
-            chunkMeshes.forEach(meshes => allMeshes.push(...meshes));
-            const intersects = raycaster.intersectObjects(allMeshes);
-
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                const blockPos = hit.point.clone().add(hit.face.normal.clone().multiplyScalar(e.button === 2 ? 0.5 : -0.5));
-                const bx = Math.round(blockPos.x);
-                const by = Math.round(blockPos.y);
-                const bz = Math.round(blockPos.z);
-
-                const cx = Math.floor(bx / CHUNK_SIZE);
-                const cz = Math.floor(bz / CHUNK_SIZE);
-                const key = getChunkKey(cx, cz);
-                const chunk = chunks.get(key);
-
-                if (e.button === 0 && chunk) {
-                    delete chunk[`${bx},${by},${bz}`];
-                    buildChunkMesh(cx, cz, chunk);
-                } else if (e.button === 2 && chunk) {
-                    const blockTypes = Object.keys(BLOCK_TYPES);
-                    chunk[`${bx},${by},${bz}`] = blockTypes[selectedSlot];
-                    buildChunkMesh(cx, cz, chunk);
-                }
-            }
-        });
-
-        document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-        // ФИЗИКА И ДВИЖЕНИЕ
         function getBlockAt(x, y, z) {
             const cx = Math.floor(x / CHUNK_SIZE);
             const cz = Math.floor(z / CHUNK_SIZE);
@@ -488,121 +531,83 @@
         }
 
         function checkCollision(pos) {
-            const x = Math.round(pos.x);
-            const y = Math.round(pos.y);
-            const z = Math.round(pos.z);
-            return getBlockAt(x, y, z) !== null;
+            return getBlockAt(pos.x, pos.y, pos.z) !== null;
         }
 
         function updatePlayer() {
-            const isRunning = keys['ShiftLeft'] || keys['ShiftRight'];
+            if (gameMode !== 'walk') return;
+
+            const isRunning = keys['ShiftLeft'];
             const speed = isRunning ? RUN_SPEED : WALK_SPEED;
 
-            if (gameMode === 'walk') {
-                // Направление движения относительно камеры
-                const forward = new THREE.Vector3(-Math.sin(playerState.cameraAngle), 0, -Math.cos(playerState.cameraAngle));
-                const right = new THREE.Vector3(Math.cos(playerState.cameraAngle), 0, -Math.sin(playerState.cameraAngle));
+            const forward = new THREE.Vector3(-Math.sin(playerState.cameraAngle), 0, -Math.cos(playerState.cameraAngle));
+            const right = new THREE.Vector3(Math.cos(playerState.cameraAngle), 0, -Math.sin(playerState.cameraAngle));
 
-                const moveDir = new THREE.Vector3(0, 0, 0);
-                if (keys['KeyW']) moveDir.add(forward);
-                if (keys['KeyS']) moveDir.sub(forward);
-                if (keys['KeyD']) moveDir.add(right);
-                if (keys['KeyA']) moveDir.sub(right);
+            const moveDir = new THREE.Vector3(0, 0, 0);
+            if (keys['KeyW']) moveDir.add(forward);
+            if (keys['KeyS']) moveDir.sub(forward);
+            if (keys['KeyD']) moveDir.add(right);
+            if (keys['KeyA']) moveDir.sub(right);
 
-                if (moveDir.length() > 0) {
-                    moveDir.normalize().multiplyScalar(speed);
-                    playerState.velocity.x = moveDir.x;
-                    playerState.velocity.z = moveDir.z;
-
-                    // Поворот персонажа в направлении движения
-                    playerState.rotation = Math.atan2(moveDir.x, moveDir.z);
-                } else {
-                    playerState.velocity.x *= 0.8;
-                    playerState.velocity.z *= 0.8;
-                }
-
-                // ПРЫЖОК
-                if (keys['Space'] && playerState.onGround) {
-                    playerState.velocity.y = JUMP_FORCE;
-                    playerState.onGround = false;
-                }
-
-                // Гравитация
-                playerState.velocity.y -= GRAVITY;
-
-                // Применение скорости с коллизиями
-                const newPos = player.position.clone();
-
-                newPos.x += playerState.velocity.x;
-                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y + 0.5, player.position.z))) {
-                    newPos.x = player.position.x;
-                    playerState.velocity.x = 0;
-                }
-
-                newPos.z += playerState.velocity.z;
-                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y + 0.5, newPos.z))) {
-                    newPos.z = player.position.z;
-                    playerState.velocity.z = 0;
-                }
-
-                newPos.y += playerState.velocity.y;
-                if (checkCollision(new THREE.Vector3(newPos.x, newPos.y + 0.5, newPos.z))) {
-                    if (playerState.velocity.y < 0) playerState.onGround = true;
-                    newPos.y = player.position.y;
-                    playerState.velocity.y = 0;
-                } else {
-                    playerState.onGround = false;
-                }
-
-                player.position.copy(newPos);
-
+            if (moveDir.length() > 0) {
+                moveDir.normalize().multiplyScalar(speed);
+                playerState.velocity.x = moveDir.x;
+                playerState.velocity.z = moveDir.z;
+                playerState.rotation = Math.atan2(moveDir.x, moveDir.z);
             } else {
-                // Режим полёта
-                const forward = new THREE.Vector3(-Math.sin(playerState.cameraAngle), 0, -Math.cos(playerState.cameraAngle));
-                const right = new THREE.Vector3(Math.cos(playerState.cameraAngle), 0, -Math.sin(playerState.cameraAngle));
-
-                const moveDir = new THREE.Vector3(0, 0, 0);
-                if (keys['KeyW']) moveDir.add(forward);
-                if (keys['KeyS']) moveDir.sub(forward);
-                if (keys['KeyD']) moveDir.add(right);
-                if (keys['KeyA']) moveDir.sub(right);
-                if (keys['Space']) moveDir.y += 1;
-                if (keys['ShiftLeft']) moveDir.y -= 1;
-
-                if (moveDir.length() > 0) {
-                    moveDir.normalize().multiplyScalar(speed * 2);
-                    player.position.add(moveDir);
-                    playerState.rotation = Math.atan2(moveDir.x, moveDir.z);
-                }
+                playerState.velocity.x *= 0.8;
+                playerState.velocity.z *= 0.8;
             }
 
-            // Поворот персонажа
+            if (keys['Space'] && playerState.onGround) {
+                playerState.velocity.y = JUMP_FORCE;
+                playerState.onGround = false;
+            }
+
+            playerState.velocity.y -= GRAVITY;
+
+            const newPos = player.position.clone();
+            newPos.x += playerState.velocity.x;
+            newPos.z += playerState.velocity.z;
+            newPos.y += playerState.velocity.y;
+
+            if (checkCollision(new THREE.Vector3(newPos.x, newPos.y - 1, newPos.z))) {
+                playerState.onGround = true;
+                playerState.velocity.y = 0;
+                newPos.y = Math.floor(newPos.y);
+            } else {
+                playerState.onGround = false;
+            }
+
+            player.position.copy(newPos);
             player.rotation.y = playerState.rotation;
 
-            // Анимация ходьбы
-            const isMoving = Math.abs(playerState.velocity.x) > 0.01 || Math.abs(playerState.velocity.z) > 0.01;
-            if (isMoving && playerState.onGround) {
-                const walkCycle = Math.sin(Date.now() * 0.01) * 0.5;
-                leftLeg.rotation.x = walkCycle;
-                rightLeg.rotation.x = -walkCycle;
-                leftArm.rotation.x = -walkCycle * 0.5;
-                rightArm.rotation.x = walkCycle * 0.5;
-            } else {
-                leftLeg.rotation.x = 0;
-                rightLeg.rotation.x = 0;
-                leftArm.rotation.x = 0;
-                rightArm.rotation.x = 0;
-            }
-
-            // Камера следует за игроком
             const camX = player.position.x + Math.sin(playerState.cameraAngle) * 6;
-            const camY = player.position.y + 3 + playerState.cameraPitch * 5;
+            const camY = player.position.y + 3;
             const camZ = player.position.z + Math.cos(playerState.cameraAngle) * 6;
             camera.position.set(camX, camY, camZ);
             camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
         }
 
-        // ЦИКЛ
+        function updateShip() {
+            if (gameMode !== 'ship') return;
+
+            if (keys['KeyW']) shipState.speed = Math.min(shipState.speed + 0.05, 2);
+            else if (keys['KeyS']) shipState.speed = Math.max(shipState.speed - 0.05, 0);
+            else shipState.speed *= 0.98;
+
+            ship.rotation.y = shipState.rotation;
+            const forward = new THREE.Vector3(0, 0, -1).applyEuler(ship.rotation);
+            ship.position.add(forward.multiplyScalar(shipState.speed));
+
+            camera.position.copy(ship.position);
+            camera.position.y += 3;
+            camera.position.z += 8;
+            camera.lookAt(ship.position);
+
+            document.getElementById('ship-speed').innerText = (shipState.speed * 100).toFixed(0);
+        }
+
         let frameCount = 0;
         let fpsTime = 0;
         let lastTime = performance.now();
@@ -623,10 +628,13 @@
             }
 
             updatePlayer();
-            updateChunks(player.position.x, player.position.z);
+            updateShip();
+
+            const currentPos = gameMode === 'ship' ? ship.position : player.position;
+            updateChunks(currentPos.x, currentPos.z, PLANET_TYPES[currentPlanetIndex]);
 
             document.getElementById('position').innerText =
-                `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
+                `${Math.floor(currentPos.x)}, ${Math.floor(currentPos.y)}, ${Math.floor(currentPos.z)}`;
 
             renderer.render(scene, camera);
         }
