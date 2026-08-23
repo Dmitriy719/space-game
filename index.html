@@ -35,11 +35,14 @@
             position: absolute;
             bottom: 15px;
             left: 15px;
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.7);
             font-family: sans-serif;
             font-size: 13px;
             pointer-events: none;
             text-align: left;
+            background: rgba(0,0,0,0.5);
+            padding: 8px;
+            border-radius: 8px;
         }
 
         #touch-indicator {
@@ -61,8 +64,8 @@
         <div>ВЫСОТА: <span id="altitude">0</span> км</div>
     </div>
     <div id="controls-hint">
-        💻 ПК: W (газ), A/D (крен), Мышь (поворот)<br>
-        📱 Телефон: Касание (газ + свайп для поворота)
+        💻 ПК: W или ↑ (газ), A/← и D/→ (крен), Мышь (поворот)<br>
+        📱 Телефон: Касание и удержание (газ + свайп для поворота)
     </div>
     <div id="touch-indicator"></div>
 
@@ -105,109 +108,120 @@
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
         scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 1.2, color: 0xffffff, transparent: true, opacity: 0.9 })));
 
-        // 4. ДЕТАЛИЗИРОВАННЫЙ КОРАБЛЬ (Сборка из частей)
+        // 4. КОРАБЛЬ (Теперь это главный объект сцены)
         const shipGroup = new THREE.Group();
+        scene.add(shipGroup);
 
-        // Корпус
+        // Корпус (длина 12, от Z=-6 до Z=6)
         const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(1.2, 1.8, 10, 8),
+            new THREE.CylinderGeometry(1, 1.5, 12, 8),
             new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.8 })
         );
         body.rotation.x = Math.PI / 2;
         shipGroup.add(body);
 
-        // Нос
+        // Нос (длина 5, от Z=-11 до Z=-6)
         const nose = new THREE.Mesh(
-            new THREE.ConeGeometry(1.2, 4, 8),
+            new THREE.ConeGeometry(1, 5, 8),
             new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.2, metalness: 0.9 })
         );
         nose.rotation.x = Math.PI / 2;
-        nose.position.z = -7;
+        nose.position.z = -8.5;
         shipGroup.add(nose);
 
         // Крылья
         const wings = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 0.3, 3.5),
+            new THREE.BoxGeometry(12, 0.2, 4),
             new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.7 })
         );
-        wings.position.z = 1.5;
+        wings.position.z = 2;
         shipGroup.add(wings);
 
-        // Кабина (стекло)
+        // Кабина
         const cockpit = new THREE.Mesh(
             new THREE.SphereGeometry(1.1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
             new THREE.MeshPhysicalMaterial({ color: 0x00ffff, emissive: 0x0044aa, emissiveIntensity: 0.5, roughness: 0.1, metalness: 0.9, transmission: 0.6, transparent: true })
         );
         cockpit.rotation.x = Math.PI / 2;
-        cockpit.position.set(0, 0.8, -1);
+        cockpit.position.set(0, 0.8, -2);
         shipGroup.add(cockpit);
 
-        // Двигатели (левый и правый)
-        const engineGeo = new THREE.CylinderGeometry(0.7, 1.1, 3, 8);
+        // Двигатели (Z=7, выступают за корпус)
+        const engineGeo = new THREE.CylinderGeometry(0.8, 1.2, 3, 8);
         engineGeo.rotateX(Math.PI / 2);
         const engineMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.8 });
 
         const engineL = new THREE.Mesh(engineGeo, engineMat);
-        engineL.position.set(-2.2, 0, 5);
+        engineL.position.set(-2.5, 0, 7);
         shipGroup.add(engineL);
 
         const engineR = new THREE.Mesh(engineGeo, engineMat);
-        engineR.position.set(2.2, 0, 5);
+        engineR.position.set(2.5, 0, 7);
         shipGroup.add(engineR);
 
-        // Свечение двигателей (Glow)
+        // Свечение двигателей
         const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        const glowL = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), glowMat);
-        glowL.position.set(-2.2, 0, 6.6);
+        const glowL = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), glowMat);
+        glowL.position.set(-2.5, 0, 8.6);
         glowL.visible = false;
         shipGroup.add(glowL);
 
-        const glowR = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 8), glowMat);
-        glowR.position.set(2.2, 0, 6.6);
+        const glowR = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), glowMat);
+        glowR.position.set(2.5, 0, 8.6);
         glowR.visible = false;
         shipGroup.add(glowR);
 
-        // Система частиц для следа двигателя
-        const pCount = 300;
+        // Система частиц
+        const pCount = 400;
         const pGeo = new THREE.BufferGeometry();
         const pPos = new Float32Array(pCount * 3);
         const pLife = new Float32Array(pCount);
         for (let i = 0; i < pCount; i++) { pLife[i] = 0; pPos[i * 3 + 2] = 9999; }
         pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
         const engineParticles = new THREE.Points(pGeo, new THREE.PointsMaterial({
-            color: 0x00ffff, size: 0.8, transparent: true, opacity: 0.8,
+            color: 0x00ffff, size: 1.0, transparent: true, opacity: 0.8,
             blending: THREE.AdditiveBlending, depthWrite: false
         }));
         shipGroup.add(engineParticles);
 
-        // Позиционируем корабль перед камерой
-        shipGroup.position.set(0, -1.5, -6);
-        shipGroup.rotation.x = 0.15; // Легкий наклон вверх
-        camera.add(shipGroup);
-        scene.add(camera);
+        // 5. КАМЕРА (Теперь она ПРИКРЕПЛЕНА к кораблю)
+        shipGroup.add(camera);
+        camera.position.set(0, 3.5, 14); // Сзади и сверху
+        camera.lookAt(0, 0, -20); // Смотрит вперед, поверх корабля
 
-        camera.position.z = 350;
-        camera.position.y = 80;
-        camera.lookAt(0, 0, 0);
+        // Начальная позиция корабля на орбите
+        shipGroup.position.set(0, 150, 0);
 
-        // 5. УПРАВЛЕНИЕ
+        // 6. УПРАВЛЕНИЕ
         let speed = 0;
-        const maxSpeed = 3.5;
-        const keys = { w: false, a: false, s: false, d: false };
+        const maxSpeed = 4.0;
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowRight: false };
         let isTouching = false, touchStartX = 0, touchStartY = 0;
         const touchIndicator = document.getElementById('touch-indicator');
 
-        window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+            if (e.key.toLowerCase() === 'w') keys.w = true;
+            if (e.key.toLowerCase() === 'a') keys.a = true;
+            if (e.key.toLowerCase() === 's') keys.s = true;
+            if (e.key.toLowerCase() === 'd') keys.d = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+            if (e.key.toLowerCase() === 'w') keys.w = false;
+            if (e.key.toLowerCase() === 'a') keys.a = false;
+            if (e.key.toLowerCase() === 's') keys.s = false;
+            if (e.key.toLowerCase() === 'd') keys.d = false;
+        });
 
         let isMouseDown = false;
         window.addEventListener('mousedown', () => isMouseDown = true);
         window.addEventListener('mouseup', () => isMouseDown = false);
         window.addEventListener('mousemove', (e) => {
             if (isMouseDown && !isTouching) {
-                camera.rotation.y -= e.movementX * 0.003;
-                camera.rotation.x -= e.movementY * 0.003;
-                camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, camera.rotation.x));
+                shipGroup.rotation.y -= e.movementX * 0.005;
+                shipGroup.rotation.x -= e.movementY * 0.005;
+                shipGroup.rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, shipGroup.rotation.x));
             }
         });
 
@@ -220,67 +234,67 @@
             if (!isTouching) return; e.preventDefault();
             const dx = e.touches[0].clientX - touchStartX;
             const dy = e.touches[0].clientY - touchStartY;
-            camera.rotation.y -= dx * 0.004;
-            camera.rotation.x -= dy * 0.004;
-            camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, camera.rotation.x));
+            shipGroup.rotation.y -= dx * 0.005;
+            shipGroup.rotation.x -= dy * 0.005;
+            shipGroup.rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, shipGroup.rotation.x));
             touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
             touchIndicator.style.left = touchStartX + 'px'; touchIndicator.style.top = touchStartY + 'px';
         }, { passive: false });
 
         window.addEventListener('touchend', () => { isTouching = false; touchIndicator.style.display = 'none'; });
 
-        // 6. ИГРОВОЙ ЦИКЛ
+        // 7. ИГРОВОЙ ЦИКЛ
         const speedEl = document.getElementById('speed');
         const altitudeEl = document.getElementById('altitude');
+        const worldPos = new THREE.Vector3();
 
         function animate() {
             requestAnimationFrame(animate);
             planet.rotation.y += 0.0003;
             atmosphere.rotation.y += 0.0003;
 
-            // Управление скоростью
-            if (keys.w || isTouching) {
-                speed = Math.min(speed + 0.03, maxSpeed);
+            // Управление скоростью (W или Стрелка Вверх или Касание)
+            if (keys.w || keys.ArrowUp || isTouching) {
+                speed = Math.min(speed + 0.05, maxSpeed);
             } else {
-                speed *= 0.97;
+                speed *= 0.96;
             }
 
-            // Анимация крена (наклона) корабля при повороте
+            // Движение КОРАБЛЯ (камера следует за ним автоматически)
+            shipGroup.translateZ(-speed);
+
+            // Анимация крена (A или Стрелка Влево / D или Стрелка Вправо)
             let targetRoll = 0;
-            if (keys.a) targetRoll = 0.5;
-            if (keys.d) targetRoll = -0.5;
+            if (keys.a || keys.ArrowLeft) targetRoll = 0.7;
+            if (keys.d || keys.ArrowRight) targetRoll = -0.7;
             shipGroup.rotation.z += (targetRoll - shipGroup.rotation.z) * 0.1;
 
-            camera.translateZ(-speed);
-
             // Анимация двигателя и частиц
-            if (speed > 0.2) {
+            if (speed > 0.3) {
                 glowL.visible = true; glowR.visible = true;
                 glowL.scale.setScalar(0.8 + Math.random() * 0.4);
                 glowR.scale.setScalar(0.8 + Math.random() * 0.4);
 
-                // Генерация новых частиц (исправлено для симметрии)
-                for (let i = 0; i < 3; i++) {
+                for (let i = 0; i < 4; i++) {
                     let idx = -1;
                     for (let j = 0; j < pCount; j++) { if (pLife[j] <= 0) { idx = j; break; } }
                     if (idx !== -1) {
                         pLife[idx] = 1.0;
-                        // Случайный выбор левого (-2.2) или правого (2.2) двигателя
-                        const offset = (Math.random() > 0.5) ? -2.2 : 2.2;
-                        pPos[idx * 3] = offset + (Math.random() - 0.5) * 0.4;
-                        pPos[idx * 3 + 1] = (Math.random() - 0.5) * 0.4;
-                        pPos[idx * 3 + 2] = 6.6;
+                        const offset = (Math.random() > 0.5) ? -2.5 : 2.5;
+                        pPos[idx * 3] = offset + (Math.random() - 0.5) * 0.5;
+                        pPos[idx * 3 + 1] = (Math.random() - 0.5) * 0.5;
+                        pPos[idx * 3 + 2] = 8.6; // Точка выхлопа
                     }
                 }
 
-                // Движение и старение частиц
                 for (let i = 0; i < pCount; i++) {
                     if (pLife[i] > 0) {
-                        pLife[i] -= 0.025;
-                        pPos[i * 3 + 2] += 0.6 + speed * 0.4; // Летят назад
-                        pPos[i * 3 + 1] += (Math.random() - 0.5) * 0.15; // Разлетаются
+                        pLife[i] -= 0.02;
+                        pPos[i * 3 + 2] += 0.8 + speed * 0.5; // Летят назад (в +Z)
+                        pPos[i * 3 + 1] += (Math.random() - 0.5) * 0.2;
+                        pPos[i * 3] += (Math.random() - 0.5) * 0.2;
                     } else {
-                        pPos[i * 3 + 2] = 9999; // Прячем
+                        pPos[i * 3 + 2] = 9999;
                     }
                 }
                 engineParticles.geometry.attributes.position.needsUpdate = true;
@@ -290,16 +304,20 @@
                 engineParticles.geometry.attributes.position.needsUpdate = true;
             }
 
-            // Обновление UI
+            // Расчет высоты через МИРОВЫЕ координаты (исправленная коллизия)
+            shipGroup.getWorldPosition(worldPos);
+            const altitude = Math.max(0, worldPos.distanceTo(new THREE.Vector3(0, 0, 0)) - planetRadius);
+
             speedEl.innerText = (speed * 100).toFixed(0);
-            const altitude = Math.max(0, camera.position.distanceTo(new THREE.Vector3(0, 0, 0)) - planetRadius);
             altitudeEl.innerText = altitude.toFixed(0);
 
-            // Простая коллизия с поверхностью
-            if (altitude < 2) {
+            // Защита от падения на планету
+            if (altitude < 3) {
                 speed = 0;
-                const dir = new THREE.Vector3().copy(camera.position).normalize();
-                camera.position.copy(dir.multiplyScalar(planetRadius + 2));
+                const dir = worldPos.clone().normalize();
+                shipGroup.position.copy(dir.multiplyScalar(planetRadius + 3));
+                shipGroup.rotation.x = 0;
+                shipGroup.rotation.z = 0;
             }
 
             renderer.render(scene, camera);
