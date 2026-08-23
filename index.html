@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Aetherbound: Planetary Odyssey</title>
+    <style>
+        /* Сброс стилей и запрет зума/скролла на мобильных */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            touch-action: none;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Интерфейс */
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 5px #00ffcc;
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: sans-serif;
+            font-size: 13px;
+            pointer-events: none;
+            text-align: left;
+        }
+        /* Индикатор касания для мобильных */
+        #touch-indicator {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(0, 255, 204, 0.5);
+            border-radius: 50%;
+            display: none;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 99;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div>СКОРОСТЬ: <span id="speed">0</span> км/с</div>
+        <div>ВЫСОТА: <span id="altitude">0</span> км</div>
+    </div>
+    <div id="controls-hint">
+        💻 ПК: W (газ), Мышь (поворот)<br>
+        📱 Телефон: Касание экрана (газ + поворот свайпом)
+    </div>
+    <div id="touch-indicator"></div>
+
+    <!-- Подключаем Three.js напрямую из надежного CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. ИНИЦИАЛИЗАЦИЯ СЦЕНЫ
+        // ==========================================
+        const scene = new THREE.Scene();
+        // Добавляем легкий туман для глубины космоса
+        scene.fog = new THREE.FogExp2(0x000000, 0.0002);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 20000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        // Ограничиваем pixel ratio для производительности на смартфонах
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // ==========================================
+        // 2. ОСВЕЩЕНИЕ
+        // ==========================================
+        const ambientLight = new THREE.AmbientLight(0x404060, 1.0);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        sunLight.position.set(200, 100, 100);
+        scene.add(sunLight);
+
+        // ==========================================
+        // 3. ОБЪЕКТЫ МИРА
+        // ==========================================
+        // Планета
+        const planetRadius = 100;
+        const planetGeo = new THREE.SphereGeometry(planetRadius, 64, 64);
+        const planetMat = new THREE.MeshPhongMaterial({
+            color: 0x1a4d8c,
+            emissive: 0x051020,
+            shininess: 15,
+            flatShading: false
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        // Атмосфера (свечение)
+        const atmoGeo = new THREE.SphereGeometry(planetRadius * 1.15, 64, 64);
+        const atmoMat = new THREE.MeshBasicMaterial({
+            color: 0x44aaff,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending
+        });
+        const atmosphere = new THREE.Mesh(atmoGeo, atmoMat);
+        scene.add(atmosphere);
+
+        // Звёзды
+        const starsGeo = new THREE.BufferGeometry();
+        const starsCount = 6000;
+        const posArray = new Float32Array(starsCount * 3);
+        for (let i = 0; i < starsCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 8000;
+        }
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starsMat = new THREE.PointsMaterial({ size: 1.2, color: 0xffffff, transparent: true, opacity: 0.9 });
+        const stars = new THREE.Points(starsGeo, starsMat);
+        scene.add(stars);
+
+        // Корабль игрока (простая модель из примитивов, привязанная к камере)
+        const shipGroup = new THREE.Group();
+        const bodyGeo = new THREE.ConeGeometry(2, 8, 8);
+        bodyGeo.rotateX(Math.PI / 2); // Поворачиваем, чтобы нос смотрел вперед
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0xcccccc, shininess: 50 });
+        const shipBody = new THREE.Mesh(bodyGeo, bodyMat);
+
+        const engineGeo = new THREE.CylinderGeometry(1, 1.5, 3, 8);
+        engineGeo.rotateX(Math.PI / 2);
+        const engineMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+        const shipEngine = new THREE.Mesh(engineGeo, engineMat);
+        shipEngine.position.z = 5;
+
+        // Огонь двигателя
+        const flameGeo = new THREE.ConeGeometry(1, 4, 8);
+        flameGeo.rotateX(-Math.PI / 2);
+        const flameMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+        const flame = new THREE.Mesh(flameGeo, flameMat);
+        flame.position.z = 7;
+        flame.visible = false;
+
+        shipGroup.add(shipBody, shipEngine, flame);
+        // Помещаем корабль чуть ниже и перед камерой
+        shipGroup.position.set(0, -2, -8);
+        camera.add(shipGroup);
+        scene.add(camera);
+
+        // Начальная позиция камеры
+        camera.position.z = 350;
+        camera.position.y = 80;
+        camera.lookAt(0, 0, 0);
+
+        // ==========================================
+        // 4. УПРАВЛЕНИЕ И ФИЗИКА
+        // ==========================================
+        let speed = 0;
+        const maxSpeed = 3.0;
+        const acceleration = 0.03;
+        const friction = 0.97;
+        const rotationSpeed = 0.003;
+
+        const keys = { w: false, a: false, s: false, d: false };
+        let isTouching = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const touchIndicator = document.getElementById('touch-indicator');
+
+        // Клавиатура (ПК)
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) keys[key] = true;
+            if (key === 'arrowup') keys.w = true;
+            if (key === 'arrowdown') keys.s = true;
+            if (key === 'arrowleft') keys.a = true;
+            if (key === 'arrowright') keys.d = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) keys[key] = false;
+            if (key === 'arrowup') keys.w = false;
+            if (key === 'arrowdown') keys.s = false;
+            if (key === 'arrowleft') keys.a = false;
+            if (key === 'arrowright') keys.d = false;
+        });
+
+        // Мышь (ПК) - вращение камеры при зажатой кнопке
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+        window.addEventListener('mousedown', () => { isMouseDown = true; });
+        window.addEventListener('mouseup', () => { isMouseDown = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (isMouseDown && !isTouching) {
+                camera.rotation.y -= e.movementX * rotationSpeed;
+                camera.rotation.x -= e.movementY * rotationSpeed;
+                camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, camera.rotation.x));
+            }
+        });
+
+        // Тач (Смартфон/Планшет)
+        window.addEventListener('touchstart', (e) => {
+            isTouching = true;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+
+            // Показываем индикатор касания
+            touchIndicator.style.display = 'block';
+            touchIndicator.style.left = touchStartX + 'px';
+            touchIndicator.style.top = touchStartY + 'px';
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isTouching) return;
+            e.preventDefault(); // КРИТИЧНО: предотвращает скролл и зум страницы
+
+            const currentX = e.touches[0].clientX;
+            const currentY = e.touches[0].clientY;
+            const deltaX = currentX - touchStartX;
+            const deltaY = currentY - touchStartY;
+
+            camera.rotation.y -= deltaX * rotationSpeed * 1.5;
+            camera.rotation.x -= deltaY * rotationSpeed * 1.5;
+            camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, camera.rotation.x));
+
+            touchStartX = currentX;
+            touchStartY = currentY;
+
+            touchIndicator.style.left = currentX + 'px';
+            touchIndicator.style.top = currentY + 'px';
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            isTouching = false;
+            touchIndicator.style.display = 'none';
+        });
+
+        // ==========================================
+        // 5. ИГРОВОЙ ЦИКЛ
+        // ==========================================
+        const speedEl = document.getElementById('speed');
+        const altitudeEl = document.getElementById('altitude');
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Медленное вращение планеты и атмосферы
+            planet.rotation.y += 0.0003;
+            atmosphere.rotation.y += 0.0003;
+
+            // Логика движения
+            if (keys.w || isTouching) {
+                speed = Math.min(speed + acceleration, maxSpeed);
+                flame.visible = true;
+                // Анимация пламени
+                flame.scale.y = 0.8 + Math.random() * 0.4;
+            } else {
+                speed *= friction;
+                flame.visible = false;
+            }
+
+            // Движение камеры (корабля) вперед по направлению взгляда
+            camera.translateZ(-speed);
+
+            // Обновление UI
+            speedEl.innerText = (speed * 100).toFixed(0);
+            const distanceToCenter = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
+            const altitude = Math.max(0, distanceToCenter - planetRadius);
+            altitudeEl.innerText = altitude.toFixed(0);
+
+            // Если упали на планету (простая коллизия)
+            if (altitude < 2) {
+                speed = 0;
+                // Отталкиваем камеру немного вверх, чтобы не проваливалась
+                const dir = new THREE.Vector3().copy(camera.position).normalize();
+                camera.position.copy(dir.multiplyScalar(planetRadius + 2));
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Адаптация под изменение размера окна (поворот экрана телефона)
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Запуск
+        animate();
+    </script>
+</body>
+</html>
