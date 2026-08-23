@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Aetherbound - Minecraft Mode</title>
+    <title>Aetherbound - Survival Mode</title>
     <style>
         body {
             margin: 0;
@@ -82,6 +82,40 @@
             padding: 10px;
             border-radius: 5px;
         }
+
+        #inventory {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            color: white;
+            font-size: 14px;
+            z-index: 100;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #inventory-item {
+            margin: 5px 0;
+            padding: 5px;
+            background: rgba(0,255,204,0.2);
+            border-radius: 3px;
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: yellow;
+            font-size: 24px;
+            z-index: 100;
+            pointer-events: none;
+            text-shadow: 0 0 10px yellow;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
     </style>
 </head>
 <body>
@@ -89,18 +123,26 @@
         <div> СКОРОСТЬ: <span id="speed">0</span> км/с</div>
         <div>📡 ВЫСОТА: <span id="altitude">0</span> км</div>
         <div>🎯 РЕЖИМ: <span id="mode">ПОЛЁТ</span></div>
+        <div> ВРЕМЯ: <span id="time">День</span></div>
     </div>
     <div id="crosshair"></div>
-    <div id="mode-indicator">F - полёт | G - ходьба</div>
+    <div id="mode-indicator">F - полёт | G - ходьба | E - собрать ресурс</div>
     <div id="controls">
         <b>ПОЛЁТ:</b> W (газ), Мышь (поворот)<br>
-        <b>ХОДЬБА:</b> WASD (движение), Пробел (прыжок), Мышь (обзор)
+        <b>ХОДЬБА:</b> WASD (движение), Пробел (прыжок), E (собрать)
     </div>
+    <div id="inventory">
+        <b>ИНВЕНТАРЬ:</b>
+        <div id="inventory-item">💎 Кристаллы: <span id="crystals">0</span></div>
+        <div id="inventory-item"> Энергия: <span id="energy">0</span></div>
+        <div id="inventory-item">🪨 Минералы: <span id="minerals">0</span></div>
+    </div>
+    <div id="message"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // ШУМ ПЕРЛИНА (упрощённая реализация)
+        // ШУМ ПЕРЛИНА
         class SimplexNoise {
             constructor() {
                 this.p = new Uint8Array(512);
@@ -143,7 +185,6 @@
 
         const simplex = new SimplexNoise();
 
-        // Функция получения высоты рельефа
         function getTerrainHeight(x, y, z) {
             const scale = 0.02;
             const amplitude = 8;
@@ -156,25 +197,26 @@
 
         // СЦЕНА
         const scene = new THREE.Scene();
-        scene.fog = new THREE.Fog(0x000000, 100, 1000);
-
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // СВЕТ
-        scene.add(new THREE.AmbientLight(0x404040, 1.5));
+        // СВЕТ (с циклом день/ночь)
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+        scene.add(ambientLight);
         const sun = new THREE.DirectionalLight(0xffffff, 1.5);
         sun.position.set(100, 100, 100);
         scene.add(sun);
 
-        // ПЛАНЕТА С РЕЛЬЕФОМ
+        let dayTime = 0;
+
+        // ПЛАНЕТА С БИОМАМИ
         const planetRadius = 100;
         const planetGeo = new THREE.SphereGeometry(planetRadius, 128, 128);
         const positions = planetGeo.attributes.position;
+        const colors = new Float32Array(positions.count * 3);
 
-        // Модифицируем вершины для создания гор
         for (let i = 0; i < positions.count; i++) {
             const x = positions.getX(i);
             const y = positions.getY(i);
@@ -183,13 +225,30 @@
             const length = Math.sqrt(x * x + y * y + z * z);
             const scale = (planetRadius + height) / length;
             positions.setXYZ(i, x * scale, y * scale, z * scale);
+
+            // Биомы по высоте
+            const color = new THREE.Color();
+            if (height < -3) {
+                color.setHex(0x1a3d6e); // Океан (тёмно-синий)
+            } else if (height < 0) {
+                color.setHex(0x2d5a8e); // Мелководье
+            } else if (height < 3) {
+                color.setHex(0x3d8e3d); // Трава (зелёный)
+            } else if (height < 6) {
+                color.setHex(0x6e5a3d); // Горы (коричневый)
+            } else {
+                color.setHex(0xffffff); // Снег (белый)
+            }
+            colors[i * 3] = color.r;
+            colors[i * 3 + 1] = color.g;
+            colors[i * 3 + 2] = color.b;
         }
 
+        planetGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         planetGeo.computeVertexNormals();
 
         const planet = new THREE.Mesh(planetGeo, new THREE.MeshPhongMaterial({
-            color: 0x2244ff,
-            emissive: 0x001133,
+            vertexColors: true,
             shininess: 15,
             flatShading: true
         }));
@@ -215,6 +274,37 @@
         }
         starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
         scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 })));
+
+        // РЕСУРСЫ (кристаллы на поверхности)
+        const resources = [];
+        const resourceTypes = [
+            { color: 0x00ffff, name: 'crystals', icon: '💎' },
+            { color: 0xffaa00, name: 'energy', icon: '⚡' },
+            { color: 0x888888, name: 'minerals', icon: '🪨' }
+        ];
+
+        for (let i = 0; i < 50; i++) {
+            const angle1 = Math.random() * Math.PI * 2;
+            const angle2 = Math.random() * Math.PI;
+            const x = Math.sin(angle2) * Math.cos(angle1) * (planetRadius + 2);
+            const y = Math.sin(angle2) * Math.sin(angle1) * (planetRadius + 2);
+            const z = Math.cos(angle2) * (planetRadius + 2);
+
+            const type = resourceTypes[Math.floor(Math.random() * resourceTypes.length)];
+            const crystal = new THREE.Mesh(
+                new THREE.OctahedronGeometry(1, 0),
+                new THREE.MeshPhongMaterial({
+                    color: type.color,
+                    emissive: type.color,
+                    emissiveIntensity: 0.5,
+                    shininess: 100
+                })
+            );
+            crystal.position.set(x, y, z);
+            crystal.userData = { type: type.name, icon: type.icon, collected: false };
+            scene.add(crystal);
+            resources.push(crystal);
+        }
 
         // КОРАБЛЬ
         const ship = new THREE.Group();
@@ -285,8 +375,9 @@
         ship.add(flame2);
 
         ship.position.set(0, 150, 0);
+        ship.visible = true;
 
-        // ИГРОК (для режима ходьбы)
+        // ИГРОК
         const player = {
             position: new THREE.Vector3(0, planetRadius + 10, 0),
             velocity: new THREE.Vector3(),
@@ -296,9 +387,17 @@
             jumpForce: 0.5
         };
 
+        // ИНВЕНТАРЬ
+        const inventory = {
+            crystals: 0,
+            energy: 0,
+            minerals: 0
+        };
+
         // РЕЖИМЫ
-        let mode = 'fly'; // 'fly' или 'walk'
+        let mode = 'fly';
         const crosshair = document.getElementById('crosshair');
+        const inventoryUI = document.getElementById('inventory');
 
         // КАМЕРА
         camera.position.set(0, 5, 20);
@@ -310,25 +409,62 @@
         const keys = {};
         let touching = false;
 
+        function showMessage(text) {
+            const msg = document.getElementById('message');
+            msg.innerText = text;
+            msg.style.opacity = 1;
+            setTimeout(() => { msg.style.opacity = 0; }, 2000);
+        }
+
         window.addEventListener('keydown', (e) => {
             keys[e.code] = true;
 
-            // Переключение режимов
             if (e.code === 'KeyF') {
                 mode = 'fly';
                 ship.visible = true;
                 crosshair.style.display = 'none';
+                inventoryUI.style.display = 'none';
                 document.getElementById('mode').innerText = 'ПОЛЁТ';
+
+                // ИСПРАВЛЕНИЕ: правильно восстанавливаем камеру
+                camera.position.set(0, 5, 20);
+                camera.rotation.set(-0.1, 0, 0);
+                ship.add(camera);
                 ship.position.copy(player.position);
-                ship.position.y += 5;
+                ship.position.y += 10;
+                showMessage('✈️ Режим полёта');
             }
+
             if (e.code === 'KeyG') {
                 mode = 'walk';
                 ship.visible = false;
                 crosshair.style.display = 'block';
+                inventoryUI.style.display = 'block';
                 document.getElementById('mode').innerText = 'ХОДЬБА';
+
+                // ИСПРАВЛЕНИЕ: отвязываем камеру от корабля
+                scene.add(camera);
                 player.position.copy(ship.position);
                 player.position.y = planetRadius + 5;
+                camera.position.copy(player.position);
+                camera.position.y += player.height;
+                showMessage('🚶 Режим ходьбы');
+            }
+
+            // Сбор ресурсов
+            if (e.code === 'KeyE' && mode === 'walk') {
+                resources.forEach(resource => {
+                    if (!resource.userData.collected) {
+                        const dist = player.position.distanceTo(resource.position);
+                        if (dist < 5) {
+                            resource.userData.collected = true;
+                            resource.visible = false;
+                            inventory[resource.userData.type]++;
+                            document.getElementById(resource.userData.type).innerText = inventory[resource.userData.type];
+                            showMessage(`${resource.userData.icon} +1 ${resource.userData.type}`);
+                        }
+                    }
+                });
             }
         });
 
@@ -359,11 +495,25 @@
             touching = false;
         });
 
+        // ЦИКЛ ДЕНЬ/НОЧЬ
+        function updateDayNight() {
+            dayTime += 0.001;
+            const sunY = Math.sin(dayTime) * 100;
+            const sunX = Math.cos(dayTime) * 100;
+            sun.position.set(sunX, sunY, 100);
+
+            const dayIntensity = Math.max(0.3, Math.sin(dayTime));
+            ambientLight.intensity = dayIntensity * 1.5;
+            sun.intensity = dayIntensity * 1.5;
+
+            const timeText = dayIntensity > 0.7 ? 'День' : dayIntensity > 0.4 ? 'Закат' : 'Ночь';
+            document.getElementById('time').innerText = timeText;
+        }
+
         // ФИЗИКА ХОДЬБЫ
         function updatePlayer() {
             if (mode !== 'walk') return;
 
-            // Движение
             const direction = new THREE.Vector3();
             if (keys['KeyW']) direction.z -= 1;
             if (keys['KeyS']) direction.z += 1;
@@ -376,19 +526,14 @@
             player.velocity.x = direction.x * player.speed;
             player.velocity.z = direction.z * player.speed;
 
-            // Прыжок
             if (keys['Space'] && player.onGround) {
                 player.velocity.y = player.jumpForce;
                 player.onGround = false;
             }
 
-            // Гравитация
             player.velocity.y -= 0.02;
-
-            // Применение скорости
             player.position.add(player.velocity);
 
-            // Проверка столкновения с поверхностью
             const distFromCenter = player.position.length();
             const surfaceHeight = planetRadius + getTerrainHeight(
                 player.position.x, player.position.y, player.position.z
@@ -402,9 +547,18 @@
                 player.onGround = false;
             }
 
-            // Камера следует за игроком
             camera.position.copy(player.position);
             camera.position.y += player.height;
+        }
+
+        // АНИМАЦИЯ РЕСУРСОВ
+        function animateResources() {
+            resources.forEach(resource => {
+                if (!resource.userData.collected) {
+                    resource.rotation.y += 0.02;
+                    resource.position.y += Math.sin(Date.now() * 0.001) * 0.01;
+                }
+            });
         }
 
         // ЦИКЛ
@@ -414,8 +568,10 @@
             planet.rotation.y += 0.0001;
             atmosphere.rotation.y += 0.0001;
 
+            updateDayNight();
+            animateResources();
+
             if (mode === 'fly') {
-                // Режим полёта
                 if (keys['KeyW'] || keys['ArrowUp'] || touching) {
                     speed = Math.min(speed + 0.15, 5);
                 } else {
@@ -453,7 +609,6 @@
                     ship.position.copy(dir.multiplyScalar(planetRadius + 5));
                 }
             } else {
-                // Режим ходьбы
                 updatePlayer();
                 const altitude = Math.max(0, player.position.length() - planetRadius);
                 document.getElementById('speed').innerText = '0';
