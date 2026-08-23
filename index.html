@@ -11,6 +11,7 @@
             background: #000;
             touch-action: none;
             user-select: none;
+            cursor: none;
         }
 
         canvas {
@@ -108,11 +109,11 @@
         starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
         scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 1.2, color: 0xffffff, transparent: true, opacity: 0.9 })));
 
-        // 4. КОРАБЛЬ (Теперь это главный объект сцены)
+        // 4. КОРАБЛЬ
         const shipGroup = new THREE.Group();
         scene.add(shipGroup);
 
-        // Корпус (длина 12, от Z=-6 до Z=6)
+        // Корпус
         const body = new THREE.Mesh(
             new THREE.CylinderGeometry(1, 1.5, 12, 8),
             new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.8 })
@@ -120,7 +121,7 @@
         body.rotation.x = Math.PI / 2;
         shipGroup.add(body);
 
-        // Нос (длина 5, от Z=-11 до Z=-6)
+        // Нос
         const nose = new THREE.Mesh(
             new THREE.ConeGeometry(1, 5, 8),
             new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.2, metalness: 0.9 })
@@ -146,7 +147,7 @@
         cockpit.position.set(0, 0.8, -2);
         shipGroup.add(cockpit);
 
-        // Двигатели (Z=7, выступают за корпус)
+        // Двигатели
         const engineGeo = new THREE.CylinderGeometry(0.8, 1.2, 3, 8);
         engineGeo.rotateX(Math.PI / 2);
         const engineMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.8 });
@@ -184,34 +185,30 @@
         }));
         shipGroup.add(engineParticles);
 
-        // 5. КАМЕРА (Теперь она ПРИКРЕПЛЕНА к кораблю)
-        shipGroup.add(camera);
-        camera.position.set(0, 3.5, 14); // Сзади и сверху
-        camera.lookAt(0, 0, -20); // Смотрит вперед, поверх корабля
-
-        // Начальная позиция корабля на орбите
+        // 5. КАМЕРА (ИСПРАВЛЕНО: камера следует за кораблем)
+        const cameraOffset = new THREE.Vector3(0, 3.5, 14);
         shipGroup.position.set(0, 150, 0);
 
         // 6. УПРАВЛЕНИЕ
         let speed = 0;
-        const maxSpeed = 4.0;
-        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowRight: false };
+        const maxSpeed = 5.0; // УВЕЛИЧЕНА МАКСИМАЛЬНАЯ СКОРОСТЬ
+        const keys = { w: false, a: false, s: false, d: false };
         let isTouching = false, touchStartX = 0, touchStartY = 0;
         const touchIndicator = document.getElementById('touch-indicator');
 
         window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-            if (e.key.toLowerCase() === 'w') keys.w = true;
-            if (e.key.toLowerCase() === 'a') keys.a = true;
-            if (e.key.toLowerCase() === 's') keys.s = true;
-            if (e.key.toLowerCase() === 'd') keys.d = true;
+            const key = e.key.toLowerCase();
+            if (key === 'w' || key === 'arrowup') keys.w = true;
+            if (key === 'a' || key === 'arrowleft') keys.a = true;
+            if (key === 's' || key === 'arrowdown') keys.s = true;
+            if (key === 'd' || key === 'arrowright') keys.d = true;
         });
         window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
-            if (e.key.toLowerCase() === 'w') keys.w = false;
-            if (e.key.toLowerCase() === 'a') keys.a = false;
-            if (e.key.toLowerCase() === 's') keys.s = false;
-            if (e.key.toLowerCase() === 'd') keys.d = false;
+            const key = e.key.toLowerCase();
+            if (key === 'w' || key === 'arrowup') keys.w = false;
+            if (key === 'a' || key === 'arrowleft') keys.a = false;
+            if (key === 's' || key === 'arrowdown') keys.s = false;
+            if (key === 'd' || key === 'arrowright') keys.d = false;
         });
 
         let isMouseDown = false;
@@ -253,21 +250,26 @@
             planet.rotation.y += 0.0003;
             atmosphere.rotation.y += 0.0003;
 
-            // Управление скоростью (W или Стрелка Вверх или Касание)
-            if (keys.w || keys.ArrowUp || isTouching) {
-                speed = Math.min(speed + 0.05, maxSpeed);
+            // Управление скоростью (УВЕЛИЧЕНО УСКОРЕНИЕ)
+            if (keys.w || isTouching) {
+                speed = Math.min(speed + 0.2, maxSpeed); // БЫЛО 0.05, СТАЛО 0.2
             } else {
                 speed *= 0.96;
             }
 
-            // Движение КОРАБЛЯ (камера следует за ним автоматически)
+            // Движение КОРАБЛЯ
             shipGroup.translateZ(-speed);
 
-            // Анимация крена (A или Стрелка Влево / D или Стрелка Вправо)
+            // Анимация крена
             let targetRoll = 0;
-            if (keys.a || keys.ArrowLeft) targetRoll = 0.7;
-            if (keys.d || keys.ArrowRight) targetRoll = -0.7;
+            if (keys.a) targetRoll = 0.7;
+            if (keys.d) targetRoll = -0.7;
             shipGroup.rotation.z += (targetRoll - shipGroup.rotation.z) * 0.1;
+
+            // КАМЕРА СЛЕДУЕТ ЗА КОРАБЛЕМ (ИСПРАВЛЕНО)
+            const relativePosition = cameraOffset.clone().applyEuler(shipGroup.rotation);
+            camera.position.copy(shipGroup.position).add(relativePosition);
+            camera.lookAt(shipGroup.position);
 
             // Анимация двигателя и частиц
             if (speed > 0.3) {
@@ -283,14 +285,14 @@
                         const offset = (Math.random() > 0.5) ? -2.5 : 2.5;
                         pPos[idx * 3] = offset + (Math.random() - 0.5) * 0.5;
                         pPos[idx * 3 + 1] = (Math.random() - 0.5) * 0.5;
-                        pPos[idx * 3 + 2] = 8.6; // Точка выхлопа
+                        pPos[idx * 3 + 2] = 8.6;
                     }
                 }
 
                 for (let i = 0; i < pCount; i++) {
                     if (pLife[i] > 0) {
                         pLife[i] -= 0.02;
-                        pPos[i * 3 + 2] += 0.8 + speed * 0.5; // Летят назад (в +Z)
+                        pPos[i * 3 + 2] += 0.8 + speed * 0.5;
                         pPos[i * 3 + 1] += (Math.random() - 0.5) * 0.2;
                         pPos[i * 3] += (Math.random() - 0.5) * 0.2;
                     } else {
@@ -304,14 +306,14 @@
                 engineParticles.geometry.attributes.position.needsUpdate = true;
             }
 
-            // Расчет высоты через МИРОВЫЕ координаты (исправленная коллизия)
+            // Расчет высоты
             shipGroup.getWorldPosition(worldPos);
             const altitude = Math.max(0, worldPos.distanceTo(new THREE.Vector3(0, 0, 0)) - planetRadius);
 
             speedEl.innerText = (speed * 100).toFixed(0);
             altitudeEl.innerText = altitude.toFixed(0);
 
-            // Защита от падения на планету
+            // Защита от падения
             if (altitude < 3) {
                 speed = 0;
                 const dir = worldPos.clone().normalize();
