@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Aetherbound: Planetary Odyssey</title>
+    <title>Aetherbound</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background: #000;
             touch-action: none;
-            user-select: none;
             cursor: none;
         }
 
         canvas {
             display: block;
-            width: 100vw;
-            height: 100vh;
         }
 
         #ui {
@@ -25,311 +22,212 @@
             top: 15px;
             left: 15px;
             color: #00ffcc;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: monospace;
             font-size: 16px;
             z-index: 100;
             pointer-events: none;
-            text-shadow: 0 0 5px #00ffcc;
         }
 
-        #controls-hint {
+        #debug {
             position: absolute;
-            bottom: 15px;
-            left: 15px;
-            color: rgba(255, 255, 255, 0.7);
-            font-family: sans-serif;
-            font-size: 13px;
+            top: 15px;
+            right: 15px;
+            color: yellow;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 100;
             pointer-events: none;
-            text-align: left;
-            background: rgba(0,0,0,0.5);
-            padding: 8px;
-            border-radius: 8px;
-        }
-
-        #touch-indicator {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            border: 2px solid rgba(0, 255, 204, 0.5);
-            border-radius: 50%;
-            display: none;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            z-index: 99;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            max-width: 300px;
         }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div>СКОРОСТЬ: <span id="speed">0</span> км/с</div>
-        <div>ВЫСОТА: <span id="altitude">0</span> км</div>
+        <div>СКОРОСТЬ: <span id="speed">0</span></div>
+        <div>ВЫСОТА: <span id="altitude">0</span></div>
     </div>
-    <div id="controls-hint">
-        💻 ПК: W или ↑ (газ), A/← и D/→ (крен), Мышь (поворот)<br>
-        📱 Телефон: Касание и удержание (газ + свайп для поворота)
-    </div>
-    <div id="touch-indicator"></div>
+    <div id="debug">Отладка:</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // 1. ИНИЦИАЛИЗАЦИЯ
+        const debug = document.getElementById('debug');
+        function log(msg) {
+            debug.innerHTML += '<br>' + msg;
+            console.log(msg);
+        }
+
+        log('Запуск игры...');
+
+        // СЦЕНА
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, 0.00015);
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 20000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
+        log('Сцена создана');
 
-        // 2. ОСВЕЩЕНИЕ
-        const ambientLight = new THREE.AmbientLight(0x404060, 1.0);
-        scene.add(ambientLight);
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        sunLight.position.set(200, 100, 100);
-        scene.add(sunLight);
+        // СВЕТ
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(100, 100, 100);
+        scene.add(sun);
+        log('Свет добавлен');
 
-        // 3. МИР: Планета и Звёзды
-        const planetRadius = 100;
+        // ПЛАНЕТА
         const planet = new THREE.Mesh(
-            new THREE.SphereGeometry(planetRadius, 64, 64),
-            new THREE.MeshPhongMaterial({ color: 0x1a4d8c, emissive: 0x051020, shininess: 15 })
+            new THREE.SphereGeometry(100, 32, 32),
+            new THREE.MeshPhongMaterial({ color: 0x2244ff })
         );
         scene.add(planet);
+        log('Планета создана');
 
-        const atmosphere = new THREE.Mesh(
-            new THREE.SphereGeometry(planetRadius * 1.15, 64, 64),
-            new THREE.MeshBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.15, side: THREE.BackSide, blending: THREE.AdditiveBlending })
-        );
-        scene.add(atmosphere);
-
+        // ЗВЕЗДЫ
         const starsGeo = new THREE.BufferGeometry();
-        const posArray = new Float32Array(6000 * 3);
-        for (let i = 0; i < 6000 * 3; i++) posArray[i] = (Math.random() - 0.5) * 8000;
-        starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ size: 1.2, color: 0xffffff, transparent: true, opacity: 0.9 })));
+        const starsPos = new Float32Array(3000 * 3);
+        for (let i = 0; i < 3000 * 3; i++) starsPos[i] = (Math.random() - 0.5) * 5000;
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
+        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1 })));
+        log('Звезды созданы');
 
-        // 4. КОРАБЛЬ
-        const shipGroup = new THREE.Group();
-        scene.add(shipGroup);
+        // КОРАБЛЬ
+        const ship = new THREE.Group();
+        scene.add(ship);
 
         // Корпус
         const body = new THREE.Mesh(
-            new THREE.CylinderGeometry(1, 1.5, 12, 8),
-            new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.8 })
+            new THREE.CylinderGeometry(1, 1.5, 10, 8),
+            new THREE.MeshPhongMaterial({ color: 0xcccccc })
         );
         body.rotation.x = Math.PI / 2;
-        shipGroup.add(body);
+        ship.add(body);
 
         // Нос
         const nose = new THREE.Mesh(
-            new THREE.ConeGeometry(1, 5, 8),
-            new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.2, metalness: 0.9 })
+            new THREE.ConeGeometry(1, 4, 8),
+            new THREE.MeshPhongMaterial({ color: 0xff2222 })
         );
         nose.rotation.x = Math.PI / 2;
-        nose.position.z = -8.5;
-        shipGroup.add(nose);
+        nose.position.z = -7;
+        ship.add(nose);
 
         // Крылья
         const wings = new THREE.Mesh(
-            new THREE.BoxGeometry(12, 0.2, 4),
-            new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.7 })
+            new THREE.BoxGeometry(10, 0.2, 3),
+            new THREE.MeshPhongMaterial({ color: 0x888888 })
         );
-        wings.position.z = 2;
-        shipGroup.add(wings);
-
-        // Кабина
-        const cockpit = new THREE.Mesh(
-            new THREE.SphereGeometry(1.1, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-            new THREE.MeshPhysicalMaterial({ color: 0x00ffff, emissive: 0x0044aa, emissiveIntensity: 0.5, roughness: 0.1, metalness: 0.9, transmission: 0.6, transparent: true })
-        );
-        cockpit.rotation.x = Math.PI / 2;
-        cockpit.position.set(0, 0.8, -2);
-        shipGroup.add(cockpit);
+        wings.position.z = 1;
+        ship.add(wings);
 
         // Двигатели
-        const engineGeo = new THREE.CylinderGeometry(0.8, 1.2, 3, 8);
-        engineGeo.rotateX(Math.PI / 2);
-        const engineMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.8 });
+        const eng1 = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.6, 0.8, 2, 8),
+            new THREE.MeshPhongMaterial({ color: 0x444444 })
+        );
+        eng1.rotation.x = Math.PI / 2;
+        eng1.position.set(-2, 0, 5);
+        ship.add(eng1);
 
-        const engineL = new THREE.Mesh(engineGeo, engineMat);
-        engineL.position.set(-2.5, 0, 7);
-        shipGroup.add(engineL);
-
-        const engineR = new THREE.Mesh(engineGeo, engineMat);
-        engineR.position.set(2.5, 0, 7);
-        shipGroup.add(engineR);
+        const eng2 = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.6, 0.8, 2, 8),
+            new THREE.MeshPhongMaterial({ color: 0x444444 })
+        );
+        eng2.rotation.x = Math.PI / 2;
+        eng2.position.set(2, 0, 5);
+        ship.add(eng2);
 
         // Свечение двигателей
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        const glowL = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), glowMat);
-        glowL.position.set(-2.5, 0, 8.6);
-        glowL.visible = false;
-        shipGroup.add(glowL);
+        const glow1 = new THREE.Mesh(
+            new THREE.SphereGeometry(0.5, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0x00ffff })
+        );
+        glow1.position.set(-2, 0, 6);
+        glow1.visible = false;
+        ship.add(glow1);
 
-        const glowR = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), glowMat);
-        glowR.position.set(2.5, 0, 8.6);
-        glowR.visible = false;
-        shipGroup.add(glowR);
+        const glow2 = new THREE.Mesh(
+            new THREE.SphereGeometry(0.5, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0x00ffff })
+        );
+        glow2.position.set(2, 0, 6);
+        glow2.visible = false;
+        ship.add(glow2);
 
-        // Система частиц
-        const pCount = 400;
-        const pGeo = new THREE.BufferGeometry();
-        const pPos = new Float32Array(pCount * 3);
-        const pLife = new Float32Array(pCount);
-        for (let i = 0; i < pCount; i++) { pLife[i] = 0; pPos[i * 3 + 2] = 9999; }
-        pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-        const engineParticles = new THREE.Points(pGeo, new THREE.PointsMaterial({
-            color: 0x00ffff, size: 1.0, transparent: true, opacity: 0.8,
-            blending: THREE.AdditiveBlending, depthWrite: false
-        }));
-        shipGroup.add(engineParticles);
+        ship.position.set(0, 150, 0);
+        log('Корабль создан на позиции: ' + ship.position.x + ', ' + ship.position.y + ', ' + ship.position.z);
 
-        // 5. КАМЕРА (ИСПРАВЛЕНО: камера следует за кораблем)
-        const cameraOffset = new THREE.Vector3(0, 3.5, 14);
-        shipGroup.position.set(0, 150, 0);
+        // КАМЕРА
+        camera.position.set(0, 3, 12);
+        ship.add(camera);
+        log('Камера прикреплена к кораблю');
 
-        // 6. УПРАВЛЕНИЕ
+        // УПРАВЛЕНИЕ
         let speed = 0;
-        const maxSpeed = 5.0; // УВЕЛИЧЕНА МАКСИМАЛЬНАЯ СКОРОСТЬ
-        const keys = { w: false, a: false, s: false, d: false };
-        let isTouching = false, touchStartX = 0, touchStartY = 0;
-        const touchIndicator = document.getElementById('touch-indicator');
+        const keys = {};
+        let touching = false;
 
         window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            if (key === 'w' || key === 'arrowup') keys.w = true;
-            if (key === 'a' || key === 'arrowleft') keys.a = true;
-            if (key === 's' || key === 'arrowdown') keys.s = true;
-            if (key === 'd' || key === 'arrowright') keys.d = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            if (key === 'w' || key === 'arrowup') keys.w = false;
-            if (key === 'a' || key === 'arrowleft') keys.a = false;
-            if (key === 's' || key === 'arrowdown') keys.s = false;
-            if (key === 'd' || key === 'arrowright') keys.d = false;
+            keys[e.code] = true;
+            log('Клавиша: ' + e.code);
         });
 
-        let isMouseDown = false;
-        window.addEventListener('mousedown', () => isMouseDown = true);
-        window.addEventListener('mouseup', () => isMouseDown = false);
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        let mouseDown = false;
+        window.addEventListener('mousedown', () => mouseDown = true);
+        window.addEventListener('mouseup', () => mouseDown = false);
         window.addEventListener('mousemove', (e) => {
-            if (isMouseDown && !isTouching) {
-                shipGroup.rotation.y -= e.movementX * 0.005;
-                shipGroup.rotation.x -= e.movementY * 0.005;
-                shipGroup.rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, shipGroup.rotation.x));
+            if (mouseDown && !touching) {
+                ship.rotation.y -= e.movementX * 0.005;
+                ship.rotation.x -= e.movementY * 0.005;
             }
         });
 
         window.addEventListener('touchstart', (e) => {
-            isTouching = true; touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
-            touchIndicator.style.display = 'block'; touchIndicator.style.left = touchStartX + 'px'; touchIndicator.style.top = touchStartY + 'px';
-        }, { passive: false });
+            touching = true;
+            log('Касание начато');
+        });
 
-        window.addEventListener('touchmove', (e) => {
-            if (!isTouching) return; e.preventDefault();
-            const dx = e.touches[0].clientX - touchStartX;
-            const dy = e.touches[0].clientY - touchStartY;
-            shipGroup.rotation.y -= dx * 0.005;
-            shipGroup.rotation.x -= dy * 0.005;
-            shipGroup.rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, shipGroup.rotation.x));
-            touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY;
-            touchIndicator.style.left = touchStartX + 'px'; touchIndicator.style.top = touchStartY + 'px';
-        }, { passive: false });
+        window.addEventListener('touchend', () => {
+            touching = false;
+            log('Касание окончено');
+        });
 
-        window.addEventListener('touchend', () => { isTouching = false; touchIndicator.style.display = 'none'; });
+        log('=== ВСЁ ГОТОВО. НАЖМИТЕ W ===');
 
-        // 7. ИГРОВОЙ ЦИКЛ
-        const speedEl = document.getElementById('speed');
-        const altitudeEl = document.getElementById('altitude');
-        const worldPos = new THREE.Vector3();
-
+        // ЦИКЛ
         function animate() {
             requestAnimationFrame(animate);
-            planet.rotation.y += 0.0003;
-            atmosphere.rotation.y += 0.0003;
 
-            // Управление скоростью (УВЕЛИЧЕНО УСКОРЕНИЕ)
-            if (keys.w || isTouching) {
-                speed = Math.min(speed + 0.2, maxSpeed); // БЫЛО 0.05, СТАЛО 0.2
+            // ДВИЖЕНИЕ
+            if (keys['KeyW'] || keys['ArrowUp'] || touching) {
+                speed = Math.min(speed + 0.1, 3);
             } else {
-                speed *= 0.96;
+                speed *= 0.95;
             }
 
-            // Движение КОРАБЛЯ
-            shipGroup.translateZ(-speed);
+            ship.translateZ(-speed);
 
-            // Анимация крена
-            let targetRoll = 0;
-            if (keys.a) targetRoll = 0.7;
-            if (keys.d) targetRoll = -0.7;
-            shipGroup.rotation.z += (targetRoll - shipGroup.rotation.z) * 0.1;
-
-            // КАМЕРА СЛЕДУЕТ ЗА КОРАБЛЕМ (ИСПРАВЛЕНО)
-            const relativePosition = cameraOffset.clone().applyEuler(shipGroup.rotation);
-            camera.position.copy(shipGroup.position).add(relativePosition);
-            camera.lookAt(shipGroup.position);
-
-            // Анимация двигателя и частиц
-            if (speed > 0.3) {
-                glowL.visible = true; glowR.visible = true;
-                glowL.scale.setScalar(0.8 + Math.random() * 0.4);
-                glowR.scale.setScalar(0.8 + Math.random() * 0.4);
-
-                for (let i = 0; i < 4; i++) {
-                    let idx = -1;
-                    for (let j = 0; j < pCount; j++) { if (pLife[j] <= 0) { idx = j; break; } }
-                    if (idx !== -1) {
-                        pLife[idx] = 1.0;
-                        const offset = (Math.random() > 0.5) ? -2.5 : 2.5;
-                        pPos[idx * 3] = offset + (Math.random() - 0.5) * 0.5;
-                        pPos[idx * 3 + 1] = (Math.random() - 0.5) * 0.5;
-                        pPos[idx * 3 + 2] = 8.6;
-                    }
-                }
-
-                for (let i = 0; i < pCount; i++) {
-                    if (pLife[i] > 0) {
-                        pLife[i] -= 0.02;
-                        pPos[i * 3 + 2] += 0.8 + speed * 0.5;
-                        pPos[i * 3 + 1] += (Math.random() - 0.5) * 0.2;
-                        pPos[i * 3] += (Math.random() - 0.5) * 0.2;
-                    } else {
-                        pPos[i * 3 + 2] = 9999;
-                    }
-                }
-                engineParticles.geometry.attributes.position.needsUpdate = true;
+            // ДВИГАТЕЛИ
+            if (speed > 0.2) {
+                glow1.visible = true;
+                glow2.visible = true;
             } else {
-                glowL.visible = false; glowR.visible = false;
-                for (let i = 0; i < pCount; i++) { pLife[i] = 0; pPos[i * 3 + 2] = 9999; }
-                engineParticles.geometry.attributes.position.needsUpdate = true;
+                glow1.visible = false;
+                glow2.visible = false;
             }
 
-            // Расчет высоты
-            shipGroup.getWorldPosition(worldPos);
-            const altitude = Math.max(0, worldPos.distanceTo(new THREE.Vector3(0, 0, 0)) - planetRadius);
-
-            speedEl.innerText = (speed * 100).toFixed(0);
-            altitudeEl.innerText = altitude.toFixed(0);
-
-            // Защита от падения
-            if (altitude < 3) {
-                speed = 0;
-                const dir = worldPos.clone().normalize();
-                shipGroup.position.copy(dir.multiplyScalar(planetRadius + 3));
-                shipGroup.rotation.x = 0;
-                shipGroup.rotation.z = 0;
-            }
+            // UI
+            document.getElementById('speed').innerText = (speed * 100).toFixed(0);
+            const alt = Math.max(0, ship.position.length() - 100);
+            document.getElementById('altitude').innerText = alt.toFixed(0);
 
             renderer.render(scene, camera);
         }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
 
         animate();
     </script>
