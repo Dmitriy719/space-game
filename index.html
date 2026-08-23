@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Aetherbound - Infinite Voxel Worlds</title>
+    <title>Aetherbound - Voxel Survival</title>
     <style>
         * {
             margin: 0;
@@ -86,7 +86,7 @@
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 12px;
+            font-size: 20px;
             position: relative;
         }
 
@@ -94,25 +94,6 @@
                 border-color: #fff;
                 background: rgba(255,255,255,0.2);
             }
-
-        .slot-count {
-            position: absolute;
-            bottom: 2px;
-            right: 4px;
-            font-size: 10px;
-        }
-
-        #mode-indicator {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: yellow;
-            font-size: 14px;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 100;
-        }
 
         #instructions {
             position: absolute;
@@ -137,29 +118,16 @@
             #instructions p {
                 margin: 10px 0;
             }
-
-        #debug {
-            position: absolute;
-            bottom: 80px;
-            left: 10px;
-            color: #0f0;
-            font-size: 11px;
-            background: rgba(0,0,0,0.7);
-            padding: 8px;
-            border-radius: 5px;
-            z-index: 100;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body>
     <div id="instructions">
-        <h1> AETHERBOUND</h1>
+        <h1>🎮 AETHERBOUND</h1>
         <p><b>Кликните чтобы начать</b></p>
         <p>WASD - движение | Пробел - прыжок</p>
-        <p>ЛКМ - ломать блок | ПКМ - ставить блок</p>
+        <p>Shift - бег | ЛКМ - ломать | ПКМ - ставить</p>
         <p>1-5 - выбор блока | F - полёт/ходьба</p>
-        <p>Shift - бег | ESC - меню</p>
+        <p>ESC - меню</p>
     </div>
 
     <div id="ui">
@@ -168,34 +136,27 @@
         <div>⚡ FPS: <span id="fps">0</span></div>
     </div>
 
-    <div id="mode-indicator">
-        <div>🌍 ПЛАНЕТА: <span id="planet-name">Земля</span></div>
-        <div>🌦️ ПОГОДА: <span id="weather">Ясно</span></div>
-    </div>
-
     <div id="crosshair"></div>
 
     <div id="hotbar">
-        <div class="hotbar-slot active" data-slot="0">🟫<span class="slot-count">∞</span></div>
-        <div class="hotbar-slot" data-slot="1">🟩<span class="slot-count">∞</span></div>
-        <div class="hotbar-slot" data-slot="2">⬜<span class="slot-count">∞</span></div>
-        <div class="hotbar-slot" data-slot="3">🟦<span class="slot-count">∞</span></div>
-        <div class="hotbar-slot" data-slot="4">🟨<span class="slot-count">∞</span></div>
+        <div class="hotbar-slot active" data-slot="0">🟫</div>
+        <div class="hotbar-slot" data-slot="1">🟩</div>
+        <div class="hotbar-slot" data-slot="2">⬜</div>
+        <div class="hotbar-slot" data-slot="3"></div>
+        <div class="hotbar-slot" data-slot="4">🟨</div>
     </div>
-
-    <div id="debug">Чанков: <span id="chunks">0</span></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // ============ ШУМ ПЕРЛИНА ============
+        // ШУМ ПЕРЛИНА
         class SimplexNoise {
-            constructor(seed = Math.random()) {
+            constructor(seed = 42) {
                 this.p = new Uint8Array(512);
                 const perm = new Uint8Array(256);
                 for (let i = 0; i < 256; i++) perm[i] = i;
                 for (let i = 255; i > 0; i--) {
-                    const j = Math.floor((seed * 1000 * (i + 1)) % (i + 1));
+                    const j = Math.floor(Math.abs(Math.sin(seed + i) * 10000) % (i + 1));
                     [perm[i], perm[j]] = [perm[j], perm[i]];
                 }
                 for (let i = 0; i < 512; i++) this.p[i] = perm[i & 255];
@@ -224,73 +185,64 @@
 
         const noise = new SimplexNoise(42);
 
-        // ============ НАСТРОЙКИ ============
+        // НАСТРОЙКИ
         const CHUNK_SIZE = 16;
-        const RENDER_DISTANCE = 4;
+        const RENDER_DISTANCE = 3;
         const BLOCK_SIZE = 1;
-        const GRAVITY = 0.015;
-        const JUMP_FORCE = 0.25;
-        const MOVE_SPEED = 0.15;
-        const SPRINT_SPEED = 0.25;
+        const GRAVITY = 0.02;
+        const JUMP_FORCE = 0.35;
+        const WALK_SPEED = 0.12;
+        const RUN_SPEED = 0.22;
 
-        // Типы блоков
         const BLOCK_TYPES = {
-            DIRT: { color: 0x8B4513, name: 'Земля' },
-            GRASS: { color: 0x228B22, name: 'Трава' },
-            STONE: { color: 0x808080, name: 'Камень' },
-            WATER: { color: 0x1E90FF, name: 'Вода' },
-            SAND: { color: 0xF4A460, name: 'Песок' }
+            DIRT: { color: 0x8B4513 },
+            GRASS: { color: 0x228B22 },
+            STONE: { color: 0x808080 },
+            WATER: { color: 0x1E90FF },
+            SAND: { color: 0xF4A460 }
         };
 
-        // ============ СЦЕНА ============
+        // СЦЕНА
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 50, 150);
+        scene.fog = new THREE.Fog(0x87CEEB, 30, 100);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        // Освещение
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+        // ОСВЕЩЕНИЕ
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(50, 100, 50);
+        sun.castShadow = true;
+        sun.shadow.camera.left = -50;
+        sun.shadow.camera.right = 50;
+        sun.shadow.camera.top = 50;
+        sun.shadow.camera.bottom = -50;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        scene.add(sun);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        sunLight.position.set(50, 100, 50);
-        sunLight.castShadow = true;
-        sunLight.shadow.camera.left = -50;
-        sunLight.shadow.camera.right = 50;
-        sunLight.shadow.camera.top = 50;
-        sunLight.shadow.camera.bottom = -50;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        scene.add(sunLight);
-
-        // ============ МИР (ЧАНКИ) ============
+        // МИР
         const chunks = new Map();
         const chunkMeshes = new Map();
         const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 
-        // Материалы для каждого типа блока
         const blockMaterials = {};
         Object.keys(BLOCK_TYPES).forEach(key => {
-            blockMaterials[key] = new THREE.MeshLambertMaterial({
-                color: BLOCK_TYPES[key].color
-            });
+            blockMaterials[key] = new THREE.MeshLambertMaterial({ color: BLOCK_TYPES[key].color });
         });
 
-        function getChunkKey(cx, cz) {
-            return `${cx},${cz}`;
-        }
+        function getChunkKey(cx, cz) { return `${cx},${cz}`; }
 
         function getHeight(wx, wz) {
-            const scale = 0.05;
+            const scale = 0.08;
             let h = 0;
-            h += noise.noise3D(wx * scale, 0, wz * scale) * 10;
-            h += noise.noise3D(wx * scale * 2, 0, wz * scale * 2) * 5;
+            h += noise.noise3D(wx * scale, 0, wz * scale) * 8;
+            h += noise.noise3D(wx * scale * 2, 0, wz * scale * 2) * 4;
             h += noise.noise3D(wx * scale * 4, 0, wz * scale * 4) * 2;
             return Math.floor(h);
         }
@@ -341,10 +293,7 @@
 
             const meshes = [];
             const instances = {};
-
-            Object.keys(BLOCK_TYPES).forEach(type => {
-                instances[type] = [];
-            });
+            Object.keys(BLOCK_TYPES).forEach(type => instances[type] = []);
 
             Object.entries(chunk).forEach(([blockKey, blockType]) => {
                 const [wx, wy, wz] = blockKey.split(',').map(Number);
@@ -353,9 +302,7 @@
 
             Object.entries(instances).forEach(([type, blocks]) => {
                 if (blocks.length === 0) return;
-
-                const material = blockMaterials[type];
-                const mesh = new THREE.InstancedMesh(blockGeometry, material, blocks.length);
+                const mesh = new THREE.InstancedMesh(blockGeometry, blockMaterials[type], blocks.length);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
 
@@ -365,7 +312,6 @@
                     dummy.updateMatrix();
                     mesh.setMatrixAt(i, dummy.matrix);
                 });
-
                 mesh.instanceMatrix.needsUpdate = true;
                 scene.add(mesh);
                 meshes.push(mesh);
@@ -380,44 +326,86 @@
 
             for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
                 for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                    const cx = pcx + dx;
-                    const cz = pcz + dz;
-                    generateChunk(cx, cz);
+                    generateChunk(pcx + dx, pcz + dz);
                 }
             }
 
-            // Удаляем дальние чанки
             chunkMeshes.forEach((meshes, key) => {
                 const [cx, cz] = key.split(',').map(Number);
-                const dist = Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz));
-                if (dist > RENDER_DISTANCE + 1) {
+                if (Math.abs(cx - pcx) > RENDER_DISTANCE + 1 || Math.abs(cz - pcz) > RENDER_DISTANCE + 1) {
                     meshes.forEach(mesh => scene.remove(mesh));
                     chunkMeshes.delete(key);
                     chunks.delete(key);
                 }
             });
-
-            document.getElementById('chunks').innerText = chunkMeshes.size;
         }
 
-        // ============ ИГРОК ============
-        const player = {
-            position: new THREE.Vector3(0, 20, 0),
-            velocity: new THREE.Vector3(0, 0, 0),
-            onGround: false,
-            height: 1.8,
-            width: 0.6,
-            rotation: new THREE.Euler(0, 0, 0, 'YXZ')
-        };
+        // ПЕРСОНАЖ (вид от третьего лица)
+        const player = new THREE.Group();
+        scene.add(player);
 
-        camera.position.copy(player.position);
-        camera.position.y += player.height;
+        // Тело
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 1.2, 0.4),
+            new THREE.MeshLambertMaterial({ color: 0x4444ff })
+        );
+        body.position.y = 0.6;
+        body.castShadow = true;
+        player.add(body);
 
-        // ============ УПРАВЛЕНИЕ ============
+        // Голова
+        const head = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.5, 0.5),
+            new THREE.MeshLambertMaterial({ color: 0xffcc99 })
+        );
+        head.position.y = 1.45;
+        head.castShadow = true;
+        player.add(head);
+
+        // Руки
+        const armGeo = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+        const armMat = new THREE.MeshLambertMaterial({ color: 0x4444ff });
+        const leftArm = new THREE.Mesh(armGeo, armMat);
+        leftArm.position.set(-0.4, 0.8, 0);
+        leftArm.castShadow = true;
+        player.add(leftArm);
+
+        const rightArm = new THREE.Mesh(armGeo, armMat);
+        rightArm.position.set(0.4, 0.8, 0);
+        rightArm.castShadow = true;
+        player.add(rightArm);
+
+        // Ноги
+        const legGeo = new THREE.BoxGeometry(0.25, 0.8, 0.25);
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x2222aa });
+        const leftLeg = new THREE.Mesh(legGeo, legMat);
+        leftLeg.position.set(-0.15, 0, 0);
+        leftLeg.castShadow = true;
+        player.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(legGeo, legMat);
+        rightLeg.position.set(0.15, 0, 0);
+        rightLeg.castShadow = true;
+        player.add(rightLeg);
+
+        player.position.set(0, 20, 0);
+
+        // Камера (следует за игроком)
+        const cameraOffset = new THREE.Vector3(0, 3, 6);
+
+        // УПРАВЛЕНИЕ
         const keys = {};
         let isPointerLocked = false;
         let selectedSlot = 0;
-        let gameMode = 'walk'; // 'walk' или 'fly'
+        let gameMode = 'walk';
+
+        const playerState = {
+            velocity: new THREE.Vector3(0, 0, 0),
+            onGround: false,
+            rotation: 0,
+            cameraAngle: 0,
+            cameraPitch: 0.3
+        };
 
         document.getElementById('instructions').addEventListener('click', () => {
             renderer.domElement.requestPointerLock();
@@ -430,35 +418,29 @@
 
         document.addEventListener('mousemove', (e) => {
             if (!isPointerLocked) return;
-            player.rotation.y -= e.movementX * 0.002;
-            player.rotation.x -= e.movementY * 0.002;
-            player.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, player.rotation.x));
+            playerState.cameraAngle -= e.movementX * 0.003;
+            playerState.cameraPitch -= e.movementY * 0.003;
+            playerState.cameraPitch = Math.max(-0.5, Math.min(1.2, playerState.cameraPitch));
         });
 
         document.addEventListener('keydown', (e) => {
             keys[e.code] = true;
-
-            // Выбор слота
             if (e.code >= 'Digit1' && e.code <= 'Digit5') {
                 selectedSlot = parseInt(e.code.charAt(5)) - 1;
                 document.querySelectorAll('.hotbar-slot').forEach((slot, i) => {
                     slot.classList.toggle('active', i === selectedSlot);
                 });
             }
-
-            // Переключение режима
             if (e.code === 'KeyF') {
                 gameMode = gameMode === 'walk' ? 'fly' : 'walk';
                 document.getElementById('mode').innerText = gameMode === 'walk' ? 'ХОДЬБА' : 'ПОЛЁТ';
-                player.velocity.set(0, 0, 0);
+                playerState.velocity.set(0, 0, 0);
             }
         });
 
-        document.addEventListener('keyup', (e) => {
-            keys[e.code] = false;
-        });
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // Raycaster для ломания/установки блоков
+        // Raycaster
         const raycaster = new THREE.Raycaster();
         raycaster.far = 6;
 
@@ -466,11 +448,8 @@
             if (!isPointerLocked) return;
 
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-            // Собираем все меши чанков
             const allMeshes = [];
             chunkMeshes.forEach(meshes => allMeshes.push(...meshes));
-
             const intersects = raycaster.intersectObjects(allMeshes);
 
             if (intersects.length > 0) {
@@ -485,26 +464,20 @@
                 const key = getChunkKey(cx, cz);
                 const chunk = chunks.get(key);
 
-                if (e.button === 0) {
-                    // Ломать блок
-                    if (chunk) {
-                        delete chunk[`${bx},${by},${bz}`];
-                        buildChunkMesh(cx, cz, chunk);
-                    }
-                } else if (e.button === 2) {
-                    // Ставить блок
-                    if (chunk) {
-                        const blockTypes = Object.keys(BLOCK_TYPES);
-                        chunk[`${bx},${by},${bz}`] = blockTypes[selectedSlot];
-                        buildChunkMesh(cx, cz, chunk);
-                    }
+                if (e.button === 0 && chunk) {
+                    delete chunk[`${bx},${by},${bz}`];
+                    buildChunkMesh(cx, cz, chunk);
+                } else if (e.button === 2 && chunk) {
+                    const blockTypes = Object.keys(BLOCK_TYPES);
+                    chunk[`${bx},${by},${bz}`] = blockTypes[selectedSlot];
+                    buildChunkMesh(cx, cz, chunk);
                 }
             }
         });
 
         document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-        // ============ ФИЗИКА ============
+        // ФИЗИКА И ДВИЖЕНИЕ
         function getBlockAt(x, y, z) {
             const cx = Math.floor(x / CHUNK_SIZE);
             const cz = Math.floor(z / CHUNK_SIZE);
@@ -521,13 +494,14 @@
             return getBlockAt(x, y, z) !== null;
         }
 
-        function updatePlayer(dt) {
-            const speed = keys['ShiftLeft'] ? SPRINT_SPEED : MOVE_SPEED;
+        function updatePlayer() {
+            const isRunning = keys['ShiftLeft'] || keys['ShiftRight'];
+            const speed = isRunning ? RUN_SPEED : WALK_SPEED;
 
             if (gameMode === 'walk') {
-                // Движение
-                const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, player.rotation.y, 0));
-                const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, player.rotation.y, 0));
+                // Направление движения относительно камеры
+                const forward = new THREE.Vector3(-Math.sin(playerState.cameraAngle), 0, -Math.cos(playerState.cameraAngle));
+                const right = new THREE.Vector3(Math.cos(playerState.cameraAngle), 0, -Math.sin(playerState.cameraAngle));
 
                 const moveDir = new THREE.Vector3(0, 0, 0);
                 if (keys['KeyW']) moveDir.add(forward);
@@ -537,81 +511,101 @@
 
                 if (moveDir.length() > 0) {
                     moveDir.normalize().multiplyScalar(speed);
-                    player.velocity.x = moveDir.x;
-                    player.velocity.z = moveDir.z;
+                    playerState.velocity.x = moveDir.x;
+                    playerState.velocity.z = moveDir.z;
+
+                    // Поворот персонажа в направлении движения
+                    playerState.rotation = Math.atan2(moveDir.x, moveDir.z);
                 } else {
-                    player.velocity.x *= 0.8;
-                    player.velocity.z *= 0.8;
+                    playerState.velocity.x *= 0.8;
+                    playerState.velocity.z *= 0.8;
                 }
 
-                // Прыжок
-                if (keys['Space'] && player.onGround) {
-                    player.velocity.y = JUMP_FORCE;
-                    player.onGround = false;
+                // ПРЫЖОК
+                if (keys['Space'] && playerState.onGround) {
+                    playerState.velocity.y = JUMP_FORCE;
+                    playerState.onGround = false;
                 }
 
                 // Гравитация
-                player.velocity.y -= GRAVITY;
+                playerState.velocity.y -= GRAVITY;
 
-                // Применение скорости с проверкой коллизий
+                // Применение скорости с коллизиями
                 const newPos = player.position.clone();
 
-                // X
-                newPos.x += player.velocity.x;
-                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y, player.position.z))) {
+                newPos.x += playerState.velocity.x;
+                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y + 0.5, player.position.z))) {
                     newPos.x = player.position.x;
-                    player.velocity.x = 0;
+                    playerState.velocity.x = 0;
                 }
 
-                // Z
-                newPos.z += player.velocity.z;
-                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y, newPos.z))) {
+                newPos.z += playerState.velocity.z;
+                if (checkCollision(new THREE.Vector3(newPos.x, player.position.y + 0.5, newPos.z))) {
                     newPos.z = player.position.z;
-                    player.velocity.z = 0;
+                    playerState.velocity.z = 0;
                 }
 
-                // Y
-                newPos.y += player.velocity.y;
-                if (checkCollision(new THREE.Vector3(newPos.x, newPos.y, newPos.z))) {
-                    if (player.velocity.y < 0) player.onGround = true;
+                newPos.y += playerState.velocity.y;
+                if (checkCollision(new THREE.Vector3(newPos.x, newPos.y + 0.5, newPos.z))) {
+                    if (playerState.velocity.y < 0) playerState.onGround = true;
                     newPos.y = player.position.y;
-                    player.velocity.y = 0;
+                    playerState.velocity.y = 0;
                 } else {
-                    player.onGround = false;
+                    playerState.onGround = false;
                 }
 
                 player.position.copy(newPos);
 
             } else {
                 // Режим полёта
-                const forward = new THREE.Vector3(0, 0, -1).applyEuler(player.rotation);
-                const right = new THREE.Vector3(1, 0, 0).applyEuler(player.rotation);
-                const up = new THREE.Vector3(0, 1, 0);
+                const forward = new THREE.Vector3(-Math.sin(playerState.cameraAngle), 0, -Math.cos(playerState.cameraAngle));
+                const right = new THREE.Vector3(Math.cos(playerState.cameraAngle), 0, -Math.sin(playerState.cameraAngle));
 
                 const moveDir = new THREE.Vector3(0, 0, 0);
                 if (keys['KeyW']) moveDir.add(forward);
                 if (keys['KeyS']) moveDir.sub(forward);
                 if (keys['KeyD']) moveDir.add(right);
                 if (keys['KeyA']) moveDir.sub(right);
-                if (keys['Space']) moveDir.add(up);
-                if (keys['ShiftLeft']) moveDir.sub(up);
+                if (keys['Space']) moveDir.y += 1;
+                if (keys['ShiftLeft']) moveDir.y -= 1;
 
                 if (moveDir.length() > 0) {
                     moveDir.normalize().multiplyScalar(speed * 2);
                     player.position.add(moveDir);
+                    playerState.rotation = Math.atan2(moveDir.x, moveDir.z);
                 }
             }
 
-            // Обновление камеры
-            camera.position.copy(player.position);
-            camera.position.y += player.height;
-            camera.rotation.copy(player.rotation);
+            // Поворот персонажа
+            player.rotation.y = playerState.rotation;
+
+            // Анимация ходьбы
+            const isMoving = Math.abs(playerState.velocity.x) > 0.01 || Math.abs(playerState.velocity.z) > 0.01;
+            if (isMoving && playerState.onGround) {
+                const walkCycle = Math.sin(Date.now() * 0.01) * 0.5;
+                leftLeg.rotation.x = walkCycle;
+                rightLeg.rotation.x = -walkCycle;
+                leftArm.rotation.x = -walkCycle * 0.5;
+                rightArm.rotation.x = walkCycle * 0.5;
+            } else {
+                leftLeg.rotation.x = 0;
+                rightLeg.rotation.x = 0;
+                leftArm.rotation.x = 0;
+                rightArm.rotation.x = 0;
+            }
+
+            // Камера следует за игроком
+            const camX = player.position.x + Math.sin(playerState.cameraAngle) * 6;
+            const camY = player.position.y + 3 + playerState.cameraPitch * 5;
+            const camZ = player.position.z + Math.cos(playerState.cameraAngle) * 6;
+            camera.position.set(camX, camY, camZ);
+            camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
         }
 
-        // ============ ЦИКЛ ============
-        let lastTime = performance.now();
+        // ЦИКЛ
         let frameCount = 0;
         let fpsTime = 0;
+        let lastTime = performance.now();
 
         function animate() {
             requestAnimationFrame(animate);
@@ -620,7 +614,6 @@
             const dt = (now - lastTime) / 1000;
             lastTime = now;
 
-            // FPS
             frameCount++;
             fpsTime += dt;
             if (fpsTime >= 1) {
@@ -629,10 +622,9 @@
                 fpsTime = 0;
             }
 
-            updatePlayer(dt);
+            updatePlayer();
             updateChunks(player.position.x, player.position.z);
 
-            // UI
             document.getElementById('position').innerText =
                 `${Math.floor(player.position.x)}, ${Math.floor(player.position.y)}, ${Math.floor(player.position.z)}`;
 
