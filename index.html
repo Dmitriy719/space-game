@@ -135,7 +135,7 @@
 </head>
 <body>
     <div id="instructions">
-        <h1>🚀 AETHERBOUND</h1>
+        <h1> AETHERBOUND</h1>
         <p><b>Кликните чтобы начать</b></p>
         <p><b>УПРАВЛЕНИЕ КОРАБЛЁМ:</b></p>
         <p>W - ускорение | S - торможение</p>
@@ -150,8 +150,8 @@
     </div>
 
     <div id="ui">
-        <div>🎯 РЕЖИМ: <span id="mode">КОРАБЛЬ</span></div>
-        <div> ПОЗИЦИЯ: <span id="position">0, 0, 0</span></div>
+        <div> РЕЖИМ: <span id="mode">КОРАБЛЬ</span></div>
+        <div>📍 ПОЗИЦИЯ: <span id="position">0, 0, 0</span></div>
         <div>🌍 ПЛАНЕТА: <span id="current-planet">Космос</span></div>
         <div>⚡ FPS: <span id="fps">0</span></div>
     </div>
@@ -171,7 +171,7 @@
 
     <div id="planet-selector">
         <button class="planet-btn" onclick="teleportToPlanet(0)">🌍 Земля (1)</button>
-        <button class="planet-btn" onclick="teleportToPlanet(1)">️ Пустыня (2)</button>
+        <button class="planet-btn" onclick="teleportToPlanet(1)">🏜️ Пустыня (2)</button>
         <button class="planet-btn" onclick="teleportToPlanet(2)">❄️ Лёд (3)</button>
         <button class="planet-btn" onclick="teleportToPlanet(3)">🌋 Лава (4)</button>
     </div>
@@ -281,7 +281,7 @@
             );
             planetSphere.position.copy(pos);
             scene.add(planetSphere);
-            planets.push({ mesh: planetSphere, type: planetType, position: pos });
+            planets.push({ mesh: planetSphere, type: planetType, position: pos, surfaceY: pos.y + 80 });
         });
 
         // ЧАНКИ (генерируются вокруг игрока на поверхности планеты)
@@ -296,7 +296,7 @@
 
         function getChunkKey(cx, cz) { return `${cx},${cz}`; }
 
-        function getHeight(wx, wz, planetType) {
+        function getHeight(wx, wz) {
             const scale = 0.05;
             let h = 0;
             h += noise.noise3D(wx * scale, 0, wz * scale) * 8;
@@ -304,7 +304,7 @@
             return Math.floor(h);
         }
 
-        function generateChunk(cx, cz, planetType) {
+        function generateChunk(cx, cz, surfaceY) {
             const key = getChunkKey(cx, cz);
             if (chunks.has(key)) return;
 
@@ -316,10 +316,11 @@
                 for (let z = 0; z < CHUNK_SIZE; z++) {
                     const wx = startX + x;
                     const wz = startZ + z;
-                    const height = getHeight(wx, wz, planetType);
+                    const height = getHeight(wx, wz);
+                    const surfaceHeight = surfaceY + height;
 
-                    for (let y = height - 3; y <= height; y++) {
-                        const blockType = y === height ? 'GRASS' : 'DIRT';
+                    for (let y = surfaceHeight - 3; y <= surfaceHeight; y++) {
+                        const blockType = y === surfaceHeight ? 'GRASS' : 'DIRT';
                         chunk[`${wx},${y},${wz}`] = blockType;
                     }
                 }
@@ -364,13 +365,13 @@
             chunkMeshes.set(key, meshes);
         }
 
-        function updateChunks(playerX, playerZ, planetType) {
+        function updateChunks(playerX, playerZ, surfaceY) {
             const pcx = Math.floor(playerX / CHUNK_SIZE);
             const pcz = Math.floor(playerZ / CHUNK_SIZE);
 
             for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
                 for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                    generateChunk(pcx + dx, pcz + dz, planetType);
+                    generateChunk(pcx + dx, pcz + dz, surfaceY);
                 }
             }
 
@@ -404,7 +405,7 @@
         head.castShadow = true;
         player.add(head);
 
-        player.position.set(0, 20, 0);
+        player.position.set(0, 100, 0);
         player.visible = false;
 
         // КОРАБЛЬ
@@ -432,6 +433,11 @@
         );
         shipWings.position.z = 1;
         ship.add(shipWings);
+
+        // Камера привязана к кораблю
+        const shipCamera = new THREE.Object3D();
+        shipCamera.position.set(0, 3, 10);
+        ship.add(shipCamera);
 
         ship.position.set(0, 100, 0);
 
@@ -476,16 +482,32 @@
 
             if (e.code === 'KeyE') {
                 if (gameMode === 'ship') {
-                    // Выйти из корабля
-                    gameMode = 'walk';
-                    player.visible = true;
-                    player.position.copy(ship.position);
-                    player.position.y = 20;
-                    ship.visible = false;
-                    document.getElementById('mode').innerText = 'ХОДЬБА';
-                    document.getElementById('ship-ui').style.display = 'none';
-                    document.getElementById('walk-ui').style.display = 'block';
-                    document.getElementById('crosshair').style.display = 'block';
+                    // Выйти из корабля - найти ближайшую планету
+                    let nearestPlanet = null;
+                    let minDist = Infinity;
+
+                    planets.forEach((planet, i) => {
+                        const dist = ship.position.distanceTo(planet.position);
+                        if (dist < minDist && dist < 200) {
+                            minDist = dist;
+                            nearestPlanet = planet;
+                            currentPlanetIndex = i;
+                        }
+                    });
+
+                    if (nearestPlanet) {
+                        gameMode = 'walk';
+                        player.visible = true;
+                        player.position.copy(ship.position);
+                        player.position.y = nearestPlanet.surfaceY + 5;
+                        ship.visible = false;
+                        document.getElementById('mode').innerText = 'ХОДЬБА';
+                        document.getElementById('ship-ui').style.display = 'none';
+                        document.getElementById('walk-ui').style.display = 'block';
+                        document.getElementById('crosshair').style.display = 'block';
+                        document.getElementById('current-planet').innerText = nearestPlanet.type.name;
+                        scene.background = new THREE.Color(nearestPlanet.type.skyColor);
+                    }
                 } else {
                     // Сесть в корабль
                     gameMode = 'ship';
@@ -497,6 +519,8 @@
                     document.getElementById('ship-ui').style.display = 'block';
                     document.getElementById('walk-ui').style.display = 'none';
                     document.getElementById('crosshair').style.display = 'none';
+                    document.getElementById('current-planet').innerText = 'Космос';
+                    scene.background = new THREE.Color(0x000000);
                 }
             }
 
@@ -516,7 +540,7 @@
             ship.position.y += 100;
             shipState.speed = 0;
             player.position.copy(ship.position);
-            player.position.y = 20;
+            player.position.y = planet.surfaceY + 5;
             document.getElementById('current-planet').innerText = planet.type.name;
             scene.background = new THREE.Color(planet.type.skyColor);
         }
@@ -574,7 +598,7 @@
             if (checkCollision(new THREE.Vector3(newPos.x, newPos.y - 1, newPos.z))) {
                 playerState.onGround = true;
                 playerState.velocity.y = 0;
-                newPos.y = Math.floor(newPos.y);
+                newPos.y = Math.floor(newPos.y) + 1;
             } else {
                 playerState.onGround = false;
             }
@@ -600,9 +624,10 @@
             const forward = new THREE.Vector3(0, 0, -1).applyEuler(ship.rotation);
             ship.position.add(forward.multiplyScalar(shipState.speed));
 
-            camera.position.copy(ship.position);
-            camera.position.y += 3;
-            camera.position.z += 8;
+            // Камера следует за кораблём
+            const cameraWorldPos = new THREE.Vector3();
+            shipCamera.getWorldPosition(cameraWorldPos);
+            camera.position.copy(cameraWorldPos);
             camera.lookAt(ship.position);
 
             document.getElementById('ship-speed').innerText = (shipState.speed * 100).toFixed(0);
@@ -631,7 +656,8 @@
             updateShip();
 
             const currentPos = gameMode === 'ship' ? ship.position : player.position;
-            updateChunks(currentPos.x, currentPos.z, PLANET_TYPES[currentPlanetIndex]);
+            const currentPlanet = planets[currentPlanetIndex];
+            updateChunks(currentPos.x, currentPos.z, currentPlanet.surfaceY);
 
             document.getElementById('position').innerText =
                 `${Math.floor(currentPos.x)}, ${Math.floor(currentPos.y)}, ${Math.floor(currentPos.z)}`;
